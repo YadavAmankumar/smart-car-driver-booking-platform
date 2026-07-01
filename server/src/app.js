@@ -4,6 +4,7 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 
 const authRoutes = require("./routes/authRoutes");
+const bookingRoutes = require("./routes/bookingRoutes");
 
 const app = express();
 
@@ -22,6 +23,9 @@ app.use(express.urlencoded({ extended: true }));
 
 // Authentication Routes
 app.use("/api/v1/auth", authRoutes);
+
+// Booking Routes
+app.use("/api/v1/bookings", bookingRoutes);
 
 // Health Check Route
 app.get("/api/v1/health", (req, res) => {
