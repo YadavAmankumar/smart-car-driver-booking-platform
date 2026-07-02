@@ -5,8 +5,10 @@ const morgan = require("morgan");
 
 const authRoutes = require("./routes/authRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
+const errorHandler = require("./middleware/error/errorHandler");
 
 const app = express();
+
 
 // ===============================
 // Global Middleware
@@ -34,5 +36,10 @@ app.get("/api/v1/health", (req, res) => {
     message: "Smart Car Driver Booking API is running 🚗",
   });
 });
+
+// ===============================
+// Global Error Handler (LAST)
+// ===============================
+app.use(errorHandler);
 
 module.exports = app;

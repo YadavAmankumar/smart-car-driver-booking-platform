@@ -20,31 +20,8 @@ exports.createBooking = asyncHandler(async (req, res) => {
     notes,
   } = req.body;
 
-  // Business Validation
-  if (serviceType === "Driver Only" && !estimatedHours) {
-    return res.status(400).json({
-      success: false,
-      message: "Estimated hours are required for Driver Only service.",
-    });
-  }
-
-  if (serviceType === "Car with Driver") {
-    if (!carType) {
-      return res.status(400).json({
-        success: false,
-        message: "Car type is required for Car with Driver service.",
-      });
-    }
-
-    if (!estimatedKm) {
-      return res.status(400).json({
-        success: false,
-        message: "Estimated kilometers are required for Car with Driver service.",
-      });
-    }
-  }
-
   const booking = await Booking.create({
+
     customerName,
     mobileNumber,
     serviceType,

@@ -1,4 +1,6 @@
 const express = require("express");
+const authMiddleware = require("../middleware/auth/authMiddleware");
+const bookingValidation = require("../middleware/bookingValidation");
 
 const {
   createBooking,
@@ -11,18 +13,19 @@ const {
 const router = express.Router();
 
 // Create Booking
-router.post("/", createBooking);
+router.post("/", authMiddleware, bookingValidation, createBooking);
 
 // Get All Bookings
-router.get("/", getAllBookings);
+router.get("/", authMiddleware, getAllBookings);
 
 // Get Booking By ID
-router.get("/:id", getBookingById);
+router.get("/:id", authMiddleware, getBookingById);
 
 // Update Booking
-router.put("/:id", updateBooking);
+router.put("/:id", authMiddleware, updateBooking);
 
 // Delete Booking
-router.delete("/:id", deleteBooking);
+router.delete("/:id", authMiddleware, deleteBooking);
 
 module.exports = router;
+
