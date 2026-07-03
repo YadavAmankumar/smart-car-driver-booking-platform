@@ -1,0 +1,12 @@
+{
+  "name": "smart-car-driver-booking-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "progress": "node scripts/progress.js",
+    "client": "cd client && npm run dev",
+    "server": "cd server && npm run dev",
+    "client:install": "cd client && npm install",
+    "server:install": "cd server && npm install"
+  }
+}
