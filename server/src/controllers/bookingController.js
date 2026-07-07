@@ -1,4 +1,5 @@
 const Booking = require("../models/Booking");
+const Payment = require("../models/Payment");
 const asyncHandler = require("../utils/asyncHandler");
 
 // @desc    Create a new booking
@@ -21,9 +22,9 @@ exports.createBooking = asyncHandler(async (req, res) => {
   } = req.body;
 
   const booking = await Booking.create({
-
     customerName,
     mobileNumber,
+    customer: req.user?._id || null,
     serviceType,
     carType,
     pickupLocation,
@@ -39,6 +40,20 @@ exports.createBooking = asyncHandler(async (req, res) => {
     rate: 0,
     totalAmount: 0,
   });
+
+  // Create initial (Pending) payment and link it to the booking
+  // NOTE: driver may not be assigned at booking creation time
+  const payment = await Payment.create({
+    bookingId: booking._id,
+    customerId: req.user?._id || null,
+    driverId: booking.driver || null,
+    amount: booking.totalAmount,
+    paymentMethod: booking.paymentMethod,
+    paymentStatus: "Pending",
+  });
+
+  booking.payment = payment._id;
+  await booking.save();
 
   res.status(201).json({
     success: true,
@@ -159,6 +174,14 @@ exports.assignBooking = asyncHandler(async (req, res) => {
 
   await booking.save();
 
+  // Sync assigned driver to the linked payment (do not create new payment)
+  // Payment is created/linked at booking creation time via booking.payment
+  if (booking.payment) {
+    await Payment.findByIdAndUpdate(booking.payment, {
+      driverId: booking.driver || null,
+    });
+  }
+
   // Populate references for the response
   const populatedBooking = await Booking.findById(booking._id)
     .populate("driver")
@@ -170,3 +193,53 @@ exports.assignBooking = asyncHandler(async (req, res) => {
     data: populatedBooking,
   });
 });
+
+/**
+ * Missing exports referenced by server/src/routes/bookingRoutes.js
+ * Keep existing Booking APIs working; these are thin wrappers/aliases.
+ */
+
+// Legacy/admin "GET /api/v1/bookings" route handler (kept for backward compatibility)
+exports.getBookings = exports.getAllBookings;
+
+// Customer "GET /api/v1/bookings/customer"
+exports.getCustomerBookings = asyncHandler(async (req, res) => {
+  const customerId = req.user?._id;
+
+  if (!customerId) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized",
+    });
+  }
+
+  const bookings = await Booking.find({ customer: customerId }).sort({ createdAt: -1 });
+
+  return res.status(200).json({
+    success: true,
+    count: bookings.length,
+    data: bookings,
+  });
+});
+
+// Admin "PUT /api/v1/bookings/:id/assign" route handler
+exports.assignDriver = exports.assignBooking;
+
+// Admin "GET /api/v1/bookings/admin/stats"
+exports.getBookingStats = asyncHandler(async (req, res) => {
+  const stats = await Booking.aggregate([
+    {
+      $group: {
+        _id: "$bookingStatus",
+        count: { $sum: 1 },
+        revenue: { $sum: { $ifNull: ["$totalAmount", 0] } },
+      },
+    },
+  ]);
+
+  return res.status(200).json({
+    success: true,
+    data: stats,
+  });
+});
+

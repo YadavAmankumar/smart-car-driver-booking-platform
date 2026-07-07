@@ -1,42 +1,102 @@
 const express = require("express");
-const authMiddleware = require("../middleware/auth/authMiddleware");
-const bookingValidation = require("../middleware/bookingValidation");
-const authorizeRoles = require("../middleware/auth/authorizeRoles");
 
 const {
   createBooking,
-  getAllBookings,
+  getBookings,
   getBookingById,
   updateBooking,
   deleteBooking,
-  assignBooking,
+  assignDriver,
+  getCustomerBookings,
+  getAllBookings,
+  getBookingStats,
 } = require("../controllers/bookingController");
+
+
+const authMiddleware = require("../middleware/auth/authMiddleware");
+const authorizeRoles = require("../middleware/auth/authorizeRoles");
 
 const router = express.Router();
 
-// Create Booking
-router.post("/", authMiddleware, bookingValidation, createBooking);
+// ===============================
+// Customer Routes
+// ===============================
 
-// Get All Bookings
-router.get("/", authMiddleware, getAllBookings);
+// Create booking
+router.post(
+  "/",
+  authMiddleware,
+  authorizeRoles("customer"),
+  createBooking
+);
 
-// Get Booking By ID
-router.get("/:id", authMiddleware, getBookingById);
+// Get logged-in customer's bookings
+router.get(
+  "/customer",
+  authMiddleware,
+  authorizeRoles("customer"),
+  getCustomerBookings
+);
 
-// Update Booking
-router.put("/:id", authMiddleware, updateBooking);
+// ===============================
+// Admin Routes
+// ===============================
 
-// Delete Booking
-router.delete("/:id", authMiddleware, deleteBooking);
+// Get all bookings
+router.get(
+  "/admin",
+  authMiddleware,
+  authorizeRoles("admin"),
+  getAllBookings
+);
 
-// Assign driver and/or car to a booking
+// Booking statistics
+router.get(
+  "/admin/stats",
+  authMiddleware,
+  authorizeRoles("admin"),
+  getBookingStats
+);
+
+// Legacy route (if you still use it)
+router.get(
+  "/",
+  authMiddleware,
+  authorizeRoles("admin"),
+  getBookings
+);
+
+// Assign driver
 router.put(
   "/:id/assign",
   authMiddleware,
   authorizeRoles("admin"),
-  assignBooking
+  assignDriver
+);
+
+// Update booking
+router.put(
+  "/:id",
+  authMiddleware,
+  authorizeRoles("admin"),
+  updateBooking
+);
+
+// Delete booking
+router.delete(
+  "/:id",
+  authMiddleware,
+  authorizeRoles("admin"),
+  deleteBooking
+);
+
+// ===============================
+// Dynamic Route (KEEP LAST)
+// ===============================
+router.get(
+  "/:id",
+  authMiddleware,
+  getBookingById
 );
 
 module.exports = router;
-
-

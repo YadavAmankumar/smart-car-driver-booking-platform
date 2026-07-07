@@ -119,6 +119,18 @@ const bookingSchema = new mongoose.Schema(
       default: "",
       maxlength: [500, "Notes cannot exceed 500 characters"],
     },
+
+    payment: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
+      default: null,
+    },
+
+    customer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   {
     timestamps: true,
