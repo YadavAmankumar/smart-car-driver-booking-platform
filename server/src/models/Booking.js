@@ -101,6 +101,18 @@ const bookingSchema = new mongoose.Schema(
       default: "Pending",
     },
 
+    driver: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Driver",
+      default: null,
+    },
+
+    car: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Car",
+      default: null,
+    },
+
     notes: {
       type: String,
       trim: true,

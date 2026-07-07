@@ -6,8 +6,10 @@ const authRoutes = require("./routes/authRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const carRoutes = require("./routes/carRoutes");
 const driverRoutes = require("./routes/driverRoutes"); // <-- Added
+const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
+
 
 // Middleware
 app.use(cors());
@@ -28,6 +30,8 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/bookings", bookingRoutes);
 app.use("/api/v1/cars", carRoutes);
 app.use("/api/v1/drivers", driverRoutes); // <-- Added
+app.use("/api/v1/admin", adminRoutes);
+
 
 // 404 Handler
 app.use((req, res) => {

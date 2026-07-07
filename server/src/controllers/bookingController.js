@@ -128,3 +128,45 @@ exports.deleteBooking = asyncHandler(async (req, res) => {
     message: "Booking deleted successfully.",
   });
 });
+
+// @desc    Assign driver and/or car to a booking
+// @route   PUT /api/bookings/:id/assign
+// @access  Admin
+exports.assignBooking = asyncHandler(async (req, res) => {
+  const { driverId, carId } = req.body;
+
+  const booking = await Booking.findById(req.params.id);
+
+  if (!booking) {
+    return res.status(404).json({
+      success: false,
+      message: "Booking not found.",
+    });
+  }
+
+  if (driverId) {
+    booking.driver = driverId;
+  }
+
+  if (carId) {
+    booking.car = carId;
+  }
+
+  // Auto-confirm if still pending
+  if (booking.bookingStatus === "Pending") {
+    booking.bookingStatus = "Confirmed";
+  }
+
+  await booking.save();
+
+  // Populate references for the response
+  const populatedBooking = await Booking.findById(booking._id)
+    .populate("driver")
+    .populate("car");
+
+  res.status(200).json({
+    success: true,
+    message: "Driver and/or car assigned successfully.",
+    data: populatedBooking,
+  });
+});
