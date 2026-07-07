@@ -5,7 +5,9 @@ const morgan = require("morgan");
 
 const authRoutes = require("./routes/authRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
+const carRoutes = require("./routes/carRoutes");
 const errorHandler = require("./middleware/error/errorHandler");
+
 
 const app = express();
 
@@ -28,6 +30,10 @@ app.use("/api/v1/auth", authRoutes);
 
 // Booking Routes
 app.use("/api/v1/bookings", bookingRoutes);
+
+// Car Routes
+app.use("/api/v1/cars", carRoutes);
+
 
 // Health Check Route
 app.get("/api/v1/health", (req, res) => {
