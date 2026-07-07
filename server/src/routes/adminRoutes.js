@@ -1,5 +1,9 @@
 const express = require("express");
-const { getDashboardStats } = require("../controllers/adminController");
+const {
+  getDashboardStats,
+  getAdminBookings,
+  patchAdminBookingStatus,
+} = require("../controllers/adminController");
 const authMiddleware = require("../middleware/auth/authMiddleware");
 const authorizeRoles = require("../middleware/auth/authorizeRoles");
 
@@ -13,5 +17,21 @@ router.get(
   getDashboardStats
 );
 
+// Admin - Booking Management
+router.get(
+  "/bookings",
+  authMiddleware,
+  authorizeRoles("admin"),
+  getAdminBookings
+);
+
+router.patch(
+  "/bookings/:id/status",
+  authMiddleware,
+  authorizeRoles("admin"),
+  patchAdminBookingStatus
+);
+
 module.exports = router;
+
 
