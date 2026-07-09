@@ -102,11 +102,122 @@ export async function getAllBookings() {
   return res.data;
 }
 
+export type CustomerBookingsResponse = GetBookingsResponse;
+
+export async function getCustomerBookings() {
+  const token = getAuthToken();
+
+  const res = await api.get<CustomerBookingsResponse>("/bookings/customer", {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  return res.data;
+}
+
+export type GetBookingByIdResponse = {
+  success?: boolean;
+  data: Booking;
+};
+
+export async function getBookingById(bookingId: string) {
+  const token = getAuthToken();
+
+  const res = await api.get<GetBookingByIdResponse>(`/bookings/${bookingId}`, {
+
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  return res.data;
+}
+
+export type CancelBookingResponse = {
+  success: boolean;
+  message?: string;
+};
+
+export async function cancelBooking(bookingId: string) {
+  void bookingId;
+
+  // Backend currently only supports DELETE /api/bookings/:id (admin route).
+
+  // Do not call it from customer UI.
+  throw new Error(
+    "Cancel booking is not supported for customer in backend APIs (DELETE is admin-protected)."
+  );
+}
+
+export type GetProfileResponse = {
+  success?: boolean;
+  user: {
+    id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    role?: string;
+  };
+};
+
+export async function getCustomerProfile() {
+  const token = getAuthToken();
+
+  const res = await api.get<GetProfileResponse>("/auth/profile", {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  return res.data;
+}
+
+export type UpdateCustomerProfilePayload = {
+  name?: string;
+  email?: string;
+  phone?: string;
+};
+
+export type UpdateProfileResponse = {
+  success?: boolean;
+  message?: string;
+  user: {
+    id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    role?: string;
+  };
+};
+
+export async function updateCustomerProfile(
+  payload: UpdateCustomerProfilePayload,
+) {
+  const token = getAuthToken();
+
+  const res = await api.put<UpdateProfileResponse>("/auth/profile", payload, {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  return res.data;
+}
 
 export function getAxiosErrorMessage(error: unknown): string {
   const err = error as AxiosError<{ message?: string }>;
   return err.response?.data?.message || err.message || "Request failed";
 }
+
 
 export function parseBackendValidationErrors(
   error: unknown

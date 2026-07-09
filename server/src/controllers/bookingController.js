@@ -1,6 +1,7 @@
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
 const asyncHandler = require("../utils/asyncHandler");
+const pricingService = require("../services/pricingService");
 
 // @desc    Create a new booking
 // @route   POST /api/bookings
@@ -19,7 +20,22 @@ exports.createBooking = asyncHandler(async (req, res) => {
     estimatedKm,
     paymentMethod,
     notes,
+
+    // Must be provided by frontend for reliable airport charge.
+    // Default to false for backward compatibility.
+    isAirportRide,
   } = req.body;
+
+  const fareResult = await pricingService.calculateFare({
+    serviceType,
+    carType,
+    estimatedHours: serviceType === "Driver Only" ? estimatedHours : undefined,
+    estimatedKm: serviceType === "Car with Driver" ? estimatedKm : undefined,
+    pickupDate: bookingDate,
+    pickupTime,
+    isAirportRide: Boolean(isAirportRide),
+    waitingMinutes: 0, // always 0 at booking creation
+  });
 
   const booking = await Booking.create({
     customerName,
@@ -36,13 +52,33 @@ exports.createBooking = asyncHandler(async (req, res) => {
     paymentMethod,
     notes,
 
-    // Pricing will be calculated later
-    rate: 0,
-    totalAmount: 0,
+    // Pricing engine outputs
+    pricingSnapshot: fareResult.pricingSnapshot,
+
+    baseFare: fareResult.baseFare,
+    ratePerKm: fareResult.ratePerKm,
+    hourlyRate: fareResult.hourlyRate,
+
+    gst: fareResult.gst,
+    airportCharge: fareResult.airportCharge,
+    waitingCharge: fareResult.waitingCharge,
+    nightCharge: fareResult.nightCharge,
+    weekendCharge: fareResult.weekendCharge,
+    minimumFare: fareResult.minimumFare,
+
+    distanceKm: fareResult.distanceKm,
+    estimatedDuration: fareResult.estimatedDuration,
+
+    distanceCharge: fareResult.distanceCharge,
+
+    estimatedFare: fareResult.estimatedFare,
+
+    // Backward compatibility fields
+    rate: fareResult.baseFare,
+    totalAmount: fareResult.estimatedFare,
   });
 
   // Create initial (Pending) payment and link it to the booking
-  // NOTE: driver may not be assigned at booking creation time
   const payment = await Payment.create({
     bookingId: booking._id,
     customerId: req.user?._id || null,
@@ -61,6 +97,7 @@ exports.createBooking = asyncHandler(async (req, res) => {
     data: booking,
   });
 });
+
 
 // @desc    Get all bookings
 // @route   GET /api/bookings

@@ -3,9 +3,11 @@
 import { useMemo, useState, useTransition } from "react";
 import { createBooking, parseBackendValidationErrors } from "@/lib/api";
 import toast from "react-hot-toast";
+import { Badge, Button, Card, CardContent, Input, Select, Textarea } from "@/components/ui/primitives";
 
 type ServiceType = "Driver Only" | "Car with Driver";
 type CarType = "AC" | "Non-AC";
+
 
 type BookingFormValues = {
   customerName: string;
@@ -242,184 +244,238 @@ function setField<K extends keyof BookingFormValues>(
   }
 
   return (
-    <form onSubmit={onSubmit} className="w-full max-w-3xl mx-auto">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Customer Name *</label>
-          <input
-            className="w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.customerName}
-            onChange={(ev) => setField("customerName", ev.target.value)}
-            placeholder="John Doe"
-          />
-          {inlineErrors.customerName ? (
-            <p className="mt-1 text-sm text-red-600">{inlineErrors.customerName}</p>
+    <form onSubmit={onSubmit} className="w-full">
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                Customer Name *
+              </label>
+              <Input
+                value={values.customerName}
+                onChange={(ev) => setField("customerName", ev.target.value)}
+                placeholder="John Doe"
+              />
+              {inlineErrors.customerName ? (
+                <p className="mt-1 text-sm text-[#DC2626]">
+                  {inlineErrors.customerName}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                Phone Number *
+              </label>
+              <Input
+                value={values.mobileNumber}
+                onChange={(ev) => setField("mobileNumber", ev.target.value)}
+                placeholder="6xxxxxxxxx"
+                inputMode="numeric"
+              />
+              {inlineErrors.mobileNumber ? (
+                <p className="mt-1 text-sm text-[#DC2626]">
+                  {inlineErrors.mobileNumber}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                Email (optional)
+              </label>
+              <Input
+                value={values.email}
+                onChange={(ev) => setField("email", ev.target.value)}
+                placeholder="john@example.com"
+                inputMode="email"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                Service Type *
+              </label>
+              <Select
+                value={values.serviceType}
+                onChange={(ev) =>
+                  setField("serviceType", ev.target.value as ServiceType)
+                }
+              >
+                <option value="Driver Only">Driver Only</option>
+                <option value="Car with Driver">Car with Driver</option>
+              </Select>
+              {inlineErrors.serviceType ? (
+                <p className="mt-1 text-sm text-[#DC2626]">
+                  {inlineErrors.serviceType}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                Pickup Location *
+              </label>
+              <Input
+                value={values.pickupLocation}
+                onChange={(ev) => setField("pickupLocation", ev.target.value)}
+                placeholder="City, Address"
+              />
+              {inlineErrors.pickupLocation ? (
+                <p className="mt-1 text-sm text-[#DC2626]">
+                  {inlineErrors.pickupLocation}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                Drop Location *
+              </label>
+              <Input
+                value={values.dropLocation}
+                onChange={(ev) => setField("dropLocation", ev.target.value)}
+                placeholder="City, Address"
+              />
+              {inlineErrors.dropLocation ? (
+                <p className="mt-1 text-sm text-[#DC2626]">
+                  {inlineErrors.dropLocation}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                Pickup Date *
+              </label>
+              <Input
+                type="date"
+                value={values.pickupDate}
+                min={formatDateYYYYMMDD(today)}
+                onChange={(ev) => setField("pickupDate", ev.target.value)}
+              />
+              {inlineErrors.pickupDate ? (
+                <p className="mt-1 text-sm text-[#DC2626]">
+                  {inlineErrors.pickupDate}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                Pickup Time *
+              </label>
+              <Input
+                type="time"
+                value={values.pickupTime}
+                onChange={(ev) => setField("pickupTime", ev.target.value)}
+              />
+              {inlineErrors.pickupTime ? (
+                <p className="mt-1 text-sm text-[#DC2626]">
+                  {inlineErrors.pickupTime}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="md:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                    Vehicle Type *
+                  </label>
+                  <p className="text-xs text-[#64748B]">
+                    {values.serviceType === "Car with Driver"
+                      ? "Your AC / Non-AC preference will be applied."
+                      : "You can still choose AC / Non-AC, but it will apply to Car with Driver bookings."}
+                  </p>
+                </div>
+                {values.serviceType === "Car with Driver" ? (
+                  <Badge tone="blue">Preference active</Badge>
+                ) : (
+                  <Badge tone="neutral">Preference saved</Badge>
+                )}
+              </div>
+
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <button
+                  type="button"
+                  className={
+                    values.vehicleType === "AC"
+                      ? "flex-1 rounded-lg border border-[#2563EB] bg-[#EFF6FF] px-4 py-2.5 text-sm font-semibold text-[#1D4ED8] shadow-sm"
+                      : "flex-1 rounded-lg border border-[#E2E8F0] bg-white px-4 py-2.5 text-sm font-semibold text-[#0F172A] hover:bg-[#F8FAFC]"
+                  }
+                  aria-pressed={values.vehicleType === "AC"}
+                  onClick={() => setField("vehicleType", "AC")}
+                >
+                  AC
+                </button>
+                <button
+                  type="button"
+                  className={
+                    values.vehicleType === "Non-AC"
+                      ? "flex-1 rounded-lg border border-[#2563EB] bg-[#EFF6FF] px-4 py-2.5 text-sm font-semibold text-[#1D4ED8] shadow-sm"
+                      : "flex-1 rounded-lg border border-[#E2E8F0] bg-white px-4 py-2.5 text-sm font-semibold text-[#0F172A] hover:bg-[#F8FAFC]"
+                  }
+                  aria-pressed={values.vehicleType === "Non-AC"}
+                  onClick={() => setField("vehicleType", "Non-AC")}
+                >
+                  Non-AC
+                </button>
+              </div>
+
+              {inlineErrors.vehicleType ? (
+                <p className="mt-1 text-sm text-[#DC2626]">
+                  {inlineErrors.vehicleType}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                Number of Passengers
+              </label>
+              <Input
+                type="number"
+                min={1}
+                value={values.numberOfPassengers}
+                onChange={(ev) =>
+                  setField(
+                    "numberOfPassengers",
+                    Math.max(1, Number(ev.target.value) || 1),
+                  )
+                }
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                Special Instructions
+              </label>
+              <Textarea
+                value={values.specialInstructions}
+                onChange={(ev) => setField("specialInstructions", ev.target.value)}
+                placeholder="Anything we should know?"
+                rows={4}
+              />
+            </div>
+          </div>
+
+          {submitError ? (
+            <p className="mt-4 text-sm text-[#DC2626]" role="alert">
+              {submitError}
+            </p>
           ) : null}
-        </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">Phone Number *</label>
-          <input
-            className="w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.mobileNumber}
-            onChange={(ev) => setField("mobileNumber", ev.target.value)}
-            placeholder="6xxxxxxxxx"
-            inputMode="numeric"
-          />
-          {inlineErrors.mobileNumber ? (
-            <p className="mt-1 text-sm text-red-600">{inlineErrors.mobileNumber}</p>
-          ) : null}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Email (optional)</label>
-          <input
-            className="w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.email}
-            onChange={(ev) => setField("email", ev.target.value)}
-            placeholder="john@example.com"
-            inputMode="email"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Service Type *</label>
-          <select
-            className="w-full rounded-md border border-slate-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.serviceType}
-            onChange={(ev) =>
-              setField("serviceType", ev.target.value as ServiceType)
-            }
-          >
-            <option value="Driver Only">Driver Only</option>
-            <option value="Car with Driver">Car with Driver</option>
-          </select>
-          {inlineErrors.serviceType ? (
-            <p className="mt-1 text-sm text-red-600">{inlineErrors.serviceType}</p>
-          ) : null}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Pickup Location *</label>
-          <input
-            className="w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.pickupLocation}
-            onChange={(ev) => setField("pickupLocation", ev.target.value)}
-            placeholder="City, Address"
-          />
-          {inlineErrors.pickupLocation ? (
-            <p className="mt-1 text-sm text-red-600">{inlineErrors.pickupLocation}</p>
-          ) : null}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Drop Location *</label>
-          <input
-            className="w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.dropLocation}
-            onChange={(ev) => setField("dropLocation", ev.target.value)}
-            placeholder="City, Address"
-          />
-          {inlineErrors.dropLocation ? (
-            <p className="mt-1 text-sm text-red-600">{inlineErrors.dropLocation}</p>
-          ) : null}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Pickup Date *</label>
-          <input
-            type="date"
-            className="w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.pickupDate}
-            min={formatDateYYYYMMDD(today)}
-            onChange={(ev) => setField("pickupDate", ev.target.value)}
-          />
-          {inlineErrors.pickupDate ? (
-            <p className="mt-1 text-sm text-red-600">{inlineErrors.pickupDate}</p>
-          ) : null}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Pickup Time *</label>
-          <input
-            type="time"
-            className="w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.pickupTime}
-            onChange={(ev) => setField("pickupTime", ev.target.value)}
-          />
-          {inlineErrors.pickupTime ? (
-            <p className="mt-1 text-sm text-red-600">{inlineErrors.pickupTime}</p>
-          ) : null}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Vehicle Type *</label>
-          <select
-            className="w-full rounded-md border border-slate-200 px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.vehicleType}
-            onChange={(ev) => setField("vehicleType", ev.target.value as CarType)}
-            disabled={values.serviceType !== "Car with Driver"}
-          >
-            <option value="AC">AC</option>
-            <option value="Non-AC">Non-AC</option>
-          </select>
-          {inlineErrors.vehicleType ? (
-            <p className="mt-1 text-sm text-red-600">{inlineErrors.vehicleType}</p>
-          ) : null}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            Number of Passengers
-          </label>
-          <input
-            type="number"
-            min={1}
-            className="w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.numberOfPassengers}
-            onChange={(ev) =>
-              setField("numberOfPassengers", Math.max(1, Number(ev.target.value) || 1))
-            }
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-1">
-            Special Instructions
-          </label>
-          <textarea
-            className="w-full rounded-md border border-slate-200 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={values.specialInstructions}
-            onChange={(ev) => setField("specialInstructions", ev.target.value)}
-            placeholder="Anything we should know?"
-            rows={4}
-          />
-        </div>
-      </div>
-
-      {submitError ? (
-        <p className="mt-3 text-sm text-red-600" role="alert">
-          {submitError}
-        </p>
-      ) : null}
-
-      <div className="mt-6 flex items-center justify-end gap-3">
-        <button
-          type="submit"
-          disabled={isPending}
-          className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {isPending ? (
-            <span className="inline-flex items-center gap-2">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-white" />
-              Submitting...
-            </span>
-          ) : (
-            "Book Now"
-          )}
-        </button>
-      </div>
+          <div className="mt-6 flex items-center justify-end">
+            <Button type="submit" disabled={isPending} className="rounded-lg">
+              {isPending ? "Submitting..." : "Book Now"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </form>
   );
 }
+
 

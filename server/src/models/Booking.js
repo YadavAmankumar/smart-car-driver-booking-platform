@@ -61,13 +61,42 @@ const bookingSchema = new mongoose.Schema(
       min: 1,
     },
 
-    // Price used at the time of booking
-    // (Copied from Pricing settings)
+    // ==============================
+    // Pricing Snapshot + Fare Breakdown
+    // ==============================
+
+    // Pricing snapshot (immutable). Store all config values used at booking time.
+    pricingSnapshot: {
+      type: Object,
+      default: {},
+    },
+
+    // Price used at the time of the booking
+    // (Kept for backward compatibility)
     rate: {
       type: Number,
       min: 0,
       default: 0,
     },
+
+    // Stored snapshot values / rates
+    baseFare: { type: Number, min: 0, default: 0 },
+    ratePerKm: { type: Number, min: 0, default: 0 },
+    hourlyRate: { type: Number, min: 0, default: 0 },
+
+    gst: { type: Number, min: 0, default: 0 },
+    airportCharge: { type: Number, min: 0, default: 0 },
+    waitingCharge: { type: Number, min: 0, default: 0 },
+    nightCharge: { type: Number, min: 0, default: 0 },
+    weekendCharge: { type: Number, min: 0, default: 0 },
+    minimumFare: { type: Number, min: 0, default: 0 },
+
+    // Distance/time breakdown
+    distanceKm: { type: Number, min: 0, default: 0 },
+    estimatedDuration: { type: Number, min: 0, default: 0 },
+
+    // Fare breakdown components
+    distanceCharge: { type: Number, min: 0, default: 0 },
 
     // Final amount charged
     // This should always be calculated on the backend
@@ -76,6 +105,9 @@ const bookingSchema = new mongoose.Schema(
       min: 0,
       default: 0,
     },
+
+    // Estimated total calculated by Pricing Engine
+    estimatedFare: { type: Number, min: 0, default: 0 },
 
     paymentMethod: {
       type: String,
@@ -138,3 +170,4 @@ const bookingSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("Booking", bookingSchema);
+
