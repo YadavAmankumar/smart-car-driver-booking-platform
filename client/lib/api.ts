@@ -160,6 +160,87 @@ export async function getAllBookings() {
   return res.data;
 }
 
+export type AdminGetBookingsResponse = GetBookingsResponse;
+
+export async function getAdminBookings(params?: {
+  status?: "Pending" | "Confirmed" | "Completed" | "Cancelled";
+  search?: string;
+}) {
+  const token = getAuthToken();
+  const query: Record<string, string> = {};
+
+  if (params?.status) query.status = params.status;
+  if (params?.search) query.search = params.search;
+
+  const res = await api.get<AdminGetBookingsResponse>("/admin/bookings", {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+    params: Object.keys(query).length ? query : undefined,
+  });
+
+  return res.data;
+}
+
+export type PatchAdminBookingStatusResponse = {
+  success: boolean;
+  message?: string;
+  data: unknown;
+};
+
+export async function patchAdminBookingStatus(
+  bookingId: string,
+  bookingStatus: "Pending" | "Confirmed" | "Completed" | "Cancelled",
+) {
+  const token = getAuthToken();
+
+  const res = await api.patch<PatchAdminBookingStatusResponse>(
+    `/admin/bookings/${bookingId}/status`,
+    { bookingStatus },
+    {
+      headers: token
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : undefined,
+    },
+  );
+
+  return res.data;
+}
+
+export type AssignBookingDriverCarResponse = {
+  success: boolean;
+  message?: string;
+  data: unknown;
+};
+
+// Backend route: PUT /api/v1/bookings/:id/assign (admin)
+export async function assignBookingDriverCar(
+  bookingId: string,
+  payload: { driverId?: string; carId?: string },
+) {
+  const token = getAuthToken();
+
+  const res = await api.put<AssignBookingDriverCarResponse>(
+    `/bookings/${bookingId}/assign`,
+    payload,
+    {
+      headers: token
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : undefined,
+    },
+  );
+
+  return res.data;
+}
+
+
+
 export type CustomerBookingsResponse = GetBookingsResponse;
 
 export async function getCustomerBookings() {
@@ -290,4 +371,113 @@ export function parseBackendValidationErrors(
   if (Array.isArray(errors)) return errors;
   return [];
 }
+
+// ---------------------------
+// Admin Fleet (Cars) APIs
+// Backend endpoints (server):
+// GET    /api/v1/cars
+// POST   /api/v1/cars
+// GET    /api/v1/cars/:id
+// PUT    /api/v1/cars/:id
+// DELETE /api/v1/cars/:id
+// ---------------------------
+
+type Car = {
+  _id?: string;
+  carName?: string;
+  carNumber?: string;
+  carType?: string;
+  isAvailable?: boolean;
+};
+
+export type GetCarsResponse = {
+  success?: boolean;
+  count?: number;
+  data: Car[];
+};
+
+export type CreateCarPayload = {
+  carName: string;
+  carNumber: string;
+  carType: "Petrol" | "Diesel" | "CNG" | "EV";
+  isAvailable: boolean;
+  isAC: boolean;
+};
+
+
+export type UpdateCarPayload = CreateCarPayload;
+
+export type CreateCarResponse = {
+  success: boolean;
+  message?: string;
+  data: Car;
+};
+
+export type UpdateCarResponse = {
+  success?: boolean;
+  message?: string;
+  data: Car;
+};
+
+export type DeleteCarResponse = {
+  success: boolean;
+  message?: string;
+};
+
+export async function getAdminCars() {
+  const token = getAuthToken();
+
+  const res = await api.get<GetCarsResponse>("/cars", {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  return res.data;
+}
+
+export async function createCar(payload: CreateCarPayload) {
+  const token = getAuthToken();
+
+  const res = await api.post<CreateCarResponse>("/cars", payload, {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  return res.data;
+}
+
+export async function updateCar(carId: string, payload: UpdateCarPayload) {
+  const token = getAuthToken();
+
+  const res = await api.put<UpdateCarResponse>(`/cars/${carId}`, payload, {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  return res.data;
+}
+
+export async function deleteCar(carId: string) {
+  const token = getAuthToken();
+
+  const res = await api.delete<DeleteCarResponse>(`/cars/${carId}`, {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  return res.data;
+}
+
 

@@ -103,7 +103,16 @@ exports.createBooking = asyncHandler(async (req, res) => {
 // @route   GET /api/bookings
 // @access  Public
 exports.getAllBookings = asyncHandler(async (req, res) => {
-  const bookings = await Booking.find().sort({ createdAt: -1 });
+  const bookings = await Booking.find()
+    .sort({ createdAt: -1 })
+    .populate({
+      path: "driver",
+      select: "driverName experience phoneNumber",
+    })
+    .populate({
+      path: "car",
+      select: "carName carNumber",
+    });
 
   res.status(200).json({
     success: true,
@@ -116,7 +125,15 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
 // @route   GET /api/bookings/:id
 // @access  Public
 exports.getBookingById = asyncHandler(async (req, res) => {
-  const booking = await Booking.findById(req.params.id);
+  const booking = await Booking.findById(req.params.id)
+    .populate({
+      path: "driver",
+      select: "driverName experience phoneNumber",
+    })
+    .populate({
+      path: "car",
+      select: "carName carNumber",
+    });
 
   if (!booking) {
     return res.status(404).json({
@@ -221,8 +238,14 @@ exports.assignBooking = asyncHandler(async (req, res) => {
 
   // Populate references for the response
   const populatedBooking = await Booking.findById(booking._id)
-    .populate("driver")
-    .populate("car");
+    .populate({
+      path: "driver",
+      select: "driverName experience phoneNumber",
+    })
+    .populate({
+      path: "car",
+      select: "carName carNumber",
+    });
 
   res.status(200).json({
     success: true,
@@ -250,7 +273,16 @@ exports.getCustomerBookings = asyncHandler(async (req, res) => {
     });
   }
 
-  const bookings = await Booking.find({ customer: customerId }).sort({ createdAt: -1 });
+  const bookings = await Booking.find({ customer: customerId })
+    .sort({ createdAt: -1 })
+    .populate({
+      path: "driver",
+      select: "driverName experience phoneNumber",
+    })
+    .populate({
+      path: "car",
+      select: "carName carNumber",
+    });
 
   return res.status(200).json({
     success: true,
