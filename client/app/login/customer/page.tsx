@@ -21,10 +21,16 @@ export default function CustomerLoginPage() {
           values: { email: values.email, password: values.password },
         });
 
-        void backendRole;
-        // Customer should return to Home after login.
-        router.replace("/");
+        if (backendRole !== "customer") {
+          // Never log in mismatched roles.
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("role");
+          router.replace("/login/customer");
+          return;
+        }
 
+        router.replace("/dashboard/customer");
       }}
     />
   );

@@ -5,8 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 
 import { siteConfig } from "@/lib/siteConfig";
+import { redirectToBookingOrLogin } from "@/lib/bookingAuth";
 
 type NavItem = { label: string; href: string };
+
 type Role = "customer" | "driver" | "admin";
 
 type StoredUser = {
@@ -42,11 +44,7 @@ function getStoredUser(): StoredUser | null {
   }
 }
 
-function getDisplayName(role: Role, user: StoredUser | null) {
-  return (
-    user?.name ?? user?.email ?? (role === "customer" ? "Customer" : role === "driver" ? "Driver" : "Admin")
-  );
-}
+
 
 function isMobileViewport() {
   if (typeof window === "undefined") return false;
@@ -75,6 +73,10 @@ export default function Navbar() {
   const loginTriggerRef = useRef<HTMLDivElement | null>(null);
   const loginMenuRef = useRef<HTMLDivElement | null>(null);
 
+  // User dropdown (desktop).
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
@@ -101,16 +103,26 @@ export default function Navbar() {
 
   useEffect(() => {
     function onDocPointerDown(e: MouseEvent | TouchEvent) {
-      if (!loginMenuOpen) return;
       const target = e.target as HTMLElement | null;
       if (!target) return;
 
-      const trigger = loginTriggerRef.current;
-      const menu = loginMenuRef.current;
-      if (trigger?.contains(target)) return;
-      if (menu?.contains(target)) return;
+      // Login menu outside click
+      if (loginMenuOpen) {
+        const trigger = loginTriggerRef.current;
+        const menu = loginMenuRef.current;
+        if (!trigger?.contains(target) && !menu?.contains(target)) {
+          setLoginMenuOpen(false);
+        }
+      }
 
-      setLoginMenuOpen(false);
+      // User menu outside click
+      if (userMenuOpen) {
+        const trigger = loginTriggerRef.current;
+        const menu = userMenuRef.current;
+        if (!trigger?.contains(target) && !menu?.contains(target)) {
+          setUserMenuOpen(false);
+        }
+      }
     }
 
     document.addEventListener("mousedown", onDocPointerDown);
@@ -119,7 +131,7 @@ export default function Navbar() {
       document.removeEventListener("mousedown", onDocPointerDown);
       document.removeEventListener("touchstart", onDocPointerDown);
     };
-  }, [loginMenuOpen]);
+  }, [loginMenuOpen, userMenuOpen]);
 
   function onNavClick(href: string) {
     if (!href.startsWith("#")) return;
@@ -144,26 +156,10 @@ export default function Navbar() {
 
   function onBookNowClick(e: React.MouseEvent) {
     e.preventDefault();
-
-    const role = getStoredRole();
-
-    if (!role) {
-      window.location.href = "/login/customer";
-      return;
-    }
-
-    if (role === "customer") {
-      window.location.href = "/booking";
-      return;
-    }
-
-    if (role === "driver") {
-      alert("Drivers cannot create bookings.");
-      return;
-    }
-
-    alert("Admins cannot create bookings.");
+    redirectToBookingOrLogin();
   }
+
+
 
   function logout() {
     localStorage.removeItem("token");
@@ -274,17 +270,81 @@ export default function Navbar() {
               </div>
             </div>
           ) : (
-            <div className="relative">
+            <div
+              ref={loginTriggerRef}
+              className="relative"
+              onMouseLeave={() => {
+                if (!isMobileViewport()) {
+                  setUserMenuOpen(false);
+                }
+              }}
+            >
               <button
                 type="button"
-                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800"
-                aria-label="Account"
+                onClick={() => setUserMenuOpen((v) => !v)}
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
               >
                 <span aria-hidden="true">👤</span>
                 <span>{authUser?.name ?? authUser?.email ?? authRole?.toString()}</span>
                 <span aria-hidden="true">▼</span>
               </button>
-              {/* Mobile/Tablet simplified: dropdown is handled by hamburger on this implementation scope */}
+
+              <div
+                ref={userMenuRef}
+                role="menu"
+                className={`absolute right-0 top-full mt-2 w-56 origin-top-right rounded-lg border border-slate-200 bg-white p-2 shadow-lg transition-all duration-150 ${
+                  userMenuOpen
+                    ? "pointer-events-auto opacity-100 translate-y-0"
+                    : "pointer-events-none opacity-0 -translate-y-1"
+                }`}
+              >
+                <div className="flex flex-col">
+                  <Link
+                    href="/dashboard"
+                    role="menuitem"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                    }}
+                  >
+                    My Dashboard
+                  </Link>
+                    <Link
+                    href="/bookings"
+
+                    role="menuitem"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                    }}
+                  >
+                    My Bookings
+                  </Link>
+                  <Link
+                    href="/profile"
+                    role="menuitem"
+                    className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                    }}
+                  >
+                    Profile
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserMenuOpen(false);
+                      logout();
+                    }}
+                    role="menuitem"
+                    className="rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Logout
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -296,17 +356,7 @@ export default function Navbar() {
             Book Now
           </button>
 
-          {authRole ? (
-            <div>
-              <button
-                type="button"
-                onClick={logout}
-                className="inline-flex items-center rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Logout
-              </button>
-            </div>
-          ) : null}
+
         </div>
 
         <div className="md:hidden">
@@ -370,39 +420,29 @@ export default function Navbar() {
                   <div className="rounded-lg border border-slate-200 bg-white p-2">
                     <p className="px-2 pb-1 text-xs font-semibold text-slate-500">Account</p>
                     <div className="flex flex-col">
-                      {authRole === "customer" ? (
-                        <>
-                          <Link
-                            href="/dashboard/customer"
-                            className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                            onClick={() => setOpenMobileMenu(false)}
-                          >
-                            My Dashboard
-                          </Link>
-                          <Link
-                            href="/bookings"
-                            className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                            onClick={() => setOpenMobileMenu(false)}
-                          >
-                            My Bookings
-                          </Link>
-                          <Link
-                            href="/profile"
-                            className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                            onClick={() => setOpenMobileMenu(false)}
-                          >
-                            Profile
-                          </Link>
-                        </>
-                      ) : (
+                      <>
                         <Link
                           href="/dashboard"
                           className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
                           onClick={() => setOpenMobileMenu(false)}
                         >
-                          Dashboard
+                          My Dashboard
                         </Link>
-                      )}
+                    <Link
+                    href="/bookings"
+                          className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                          onClick={() => setOpenMobileMenu(false)}
+                        >
+                          My Bookings
+                        </Link>
+                        <Link
+                          href="/profile"
+                          className="rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                          onClick={() => setOpenMobileMenu(false)}
+                        >
+                          Profile
+                        </Link>
+                      </>
 
                       <button
                         type="button"

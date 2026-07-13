@@ -66,78 +66,143 @@ export default function Page() {
 
   return (
     <CustomerDashboardLayout>
-      <main className="space-y-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-              Profile
-            </h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Update your customer information.
-            </p>
-          </div>
+      <main className="space-y-6">
+        {/* Consistent page header */}
+        <div className="rounded-2xl border border-slate-200 bg-white/70 p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-slate-900">Profile</p>
+              <p className="text-xs text-slate-600">
+                Manage your personal information and account.
+              </p>
+            </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
-            Role: {role}
+            <div className="flex items-center gap-2">
+              <a
+                href="/dashboard/customer"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                <span aria-hidden="true">←</span>
+                Back
+              </a>
+            </div>
           </div>
         </div>
 
-        <Card>
-          <CardContent className="p-6">
-            {loading ? (
-              <div className="text-slate-600">Loading profile…</div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Name</label>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                  />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
+          <Card className="rounded-2xl">
+            <CardContent className="p-6">
+              {loading ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-6 text-slate-600 shadow-sm">
+                  Loading profile…
                 </div>
+              ) : (
+                <div className="space-y-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        Personal Information
+                      </p>
+                      <p className="mt-1 text-xs text-slate-600">
+                        Keep your details up to date.
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+                      Customer
+                    </div>
+                  </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">Email</label>
-                  <Input
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    type="email"
-                  />
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">
+                        Name
+                      </label>
+                      <Input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-slate-700">
+                        Email
+                      </label>
+                      <Input
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        type="email"
+                      />
+                    </div>
+
+                    <div className="space-y-2 sm:col-span-2">
+                      <label className="text-sm font-semibold text-slate-700">
+                        Phone
+                      </label>
+                      <Input
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        type="tel"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="text-xs text-slate-500">
+                          Tip: Edit your details and save to update your customer profile.
+
+                        </p>
+
+                        <Button
+                          type="button"
+                          variant="primary"
+                          className="rounded-xl px-6"
+                          disabled={saving || !isDirty}
+                          onClick={() => void onSave()}
+                        >
+                          {saving ? "Saving…" : "Edit Profile"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
+              )}
+            </CardContent>
+          </Card>
 
-                <div className="space-y-2 sm:col-span-2">
-                  <label className="text-sm font-semibold text-slate-700">Phone</label>
-                  <Input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Phone number"
-                    type="tel"
-                  />
-                </div>
+          <div className="space-y-5">
+            <Card className="rounded-2xl">
+              <CardContent className="p-6">
+                <p className="text-sm font-semibold text-slate-900">
+                  Profile Actions
+                </p>
+                <p className="mt-2 text-xs text-slate-600">
+                  Manage your account quickly.
+                </p>
 
-                <div className="sm:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-xs text-slate-500">
-                    Tip: You can update name, email, and phone using existing APIs.
-                  </p>
-
-                  <Button
-                    type="button"
-                    variant="primary"
-                    className="rounded-lg px-6"
-                    disabled={saving || !isDirty}
-                    onClick={() => void onSave()}
+                <div className="mt-5 grid grid-cols-1 gap-3">
+                  <a
+                    href="/profile"
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"
                   >
-                    {saving ? "Saving…" : "Edit Profile"}
-                  </Button>
+                    Edit Profile
+                  </a>
+
+                  {/* Keep existing functionality; no additional endpoints added. */}
+                  <a
+                    href="/profile"
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"
+                  >
+                    Change Password
+                  </a>
+
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
     </CustomerDashboardLayout>
   );
 }
+
 

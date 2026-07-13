@@ -1,11 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+
 import { motion } from "framer-motion";
 import { ArrowRight, Car } from "lucide-react";
 
+import { redirectToBookingOrLogin } from "@/lib/bookingAuth";
+
 export default function Hero() {
+
   return (
     <section id="home" className="relative overflow-hidden">
       <div className="absolute inset-0 -z-10 bg-gradient-to-b from-slate-50 via-white to-white" />
@@ -30,13 +33,15 @@ export default function Hero() {
             </p>
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link
-                href="/booking"
+              <button
+                type="button"
+                onClick={redirectToBookingOrLogin}
                 className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
               >
                 Book Now
                 <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
-              </Link>
+              </button>
+
               <a
                 href="#services"
                 className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"

@@ -70,6 +70,63 @@ function getAuthToken(): string | null {
   return localStorage.getItem("token");
 }
 
+export type EstimatePricingPayload = {
+  pickupLocation: string;
+  dropLocation: string;
+  serviceType: "Driver Only" | "Car with Driver";
+  carType?: "AC" | "Non-AC";
+  estimatedHours?: number;
+  bookingDate: string;
+  pickupTime: string;
+  paymentMethod: "Cash" | "UPI" | "Card" | "Net Banking";
+};
+
+export type FareBreakdown = {
+  baseFare?: number;
+  distanceCharge?: number;
+  waitingCharge?: number;
+  airportCharge?: number;
+  nightCharge?: number;
+  weekendCharge?: number;
+  gst?: number;
+  estimatedTotal?: number;
+};
+
+export type EstimatePricingResponse = {
+  success?: boolean;
+  data?: {
+    baseFare?: number;
+    distanceCharge?: number;
+    waitingCharge?: number;
+    airportCharge?: number;
+    nightCharge?: number;
+    weekendCharge?: number;
+    gst?: number;
+    estimatedTotal?: number;
+    distanceKm?: number;
+    estimatedDuration?: number;
+  };
+  message?: string;
+};
+
+export async function estimatePricing(payload: EstimatePricingPayload) {
+  const token = getAuthToken();
+
+  const res = await api.post<EstimatePricingResponse>(
+    "/pricing/estimate",
+    payload,
+    {
+      headers: token
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : undefined,
+    }
+  );
+
+  return res.data;
+}
+
 export async function createBooking(payload: BookingPayload) {
   const token = getAuthToken();
 
@@ -87,6 +144,7 @@ export async function createBooking(payload: BookingPayload) {
 
   return res.data;
 }
+
 
 export async function getAllBookings() {
   const token = getAuthToken();

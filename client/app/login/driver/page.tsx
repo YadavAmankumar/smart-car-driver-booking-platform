@@ -14,13 +14,20 @@ export default function DriverLoginPage() {
       actionLabel="Login"
       role="driver"
       onLogin={async (values) => {
-        await loginAndPersist({
+        const { backendRole } = await loginAndPersist({
           role: "driver",
           values: { email: values.email, password: values.password },
         });
-        router.replace("/dashboard");
 
+        if (backendRole !== "driver") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("role");
+          router.replace("/login/driver");
+          return;
+        }
 
+        router.replace("/driver/dashboard");
       }}
     />
   );

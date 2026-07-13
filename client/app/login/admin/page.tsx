@@ -14,11 +14,20 @@ export default function AdminLoginPage() {
       actionLabel="Login"
       role="admin"
       onLogin={async (values) => {
-        await loginAndPersist({
+        const { backendRole } = await loginAndPersist({
           role: "admin",
           values: { email: values.email, password: values.password },
         });
-        router.replace("/dashboard");
+
+        if (backendRole !== "admin") {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          localStorage.removeItem("role");
+          router.replace("/login/admin");
+          return;
+        }
+
+        router.replace("/admin/dashboard");
       }}
     />
   );

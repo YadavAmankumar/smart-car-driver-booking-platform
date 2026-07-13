@@ -64,14 +64,7 @@ export default function CustomerSidebar({
           })}
         </nav>
 
-        <div className="mt-auto">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold text-slate-700">Tips</p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-600">
-              View your bookings, track status, and manage your profile.
-            </p>
-          </div>
-        </div>
+
       </div>
     </aside>
   );

@@ -1,11 +1,17 @@
-import Link from "next/link";
+"use client";
+
 import { Mail, MapPin, Phone } from "lucide-react";
 
+import { redirectToBookingOrLogin } from "@/lib/bookingAuth";
 import { siteConfig } from "@/lib/siteConfig";
 
 export default function Footer() {
+
+
+
   return (
     <footer className="border-t border-slate-200 bg-white">
+
       <div className="mx-auto max-w-6xl px-4 py-10" id="contact">
         <div className="grid gap-8 md:grid-cols-2">
           <div>
@@ -59,12 +65,14 @@ export default function Footer() {
             </div>
 
             <div className="mt-6">
-              <Link
-                href="/booking"
+              <button
+                type="button"
+                onClick={redirectToBookingOrLogin}
                 className="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 md:w-auto"
               >
                 Book Now
-              </Link>
+              </button>
+
             </div>
           </div>
         </div>

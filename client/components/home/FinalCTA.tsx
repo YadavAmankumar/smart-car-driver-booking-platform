@@ -1,7 +1,12 @@
+"use client";
+
 import { Phone, Sparkles } from "lucide-react";
-import Link from "next/link";
+
+
+import { redirectToBookingOrLogin } from "@/lib/bookingAuth";
 
 export default function FinalCTA() {
+
   return (
     <section className="mx-auto max-w-6xl px-4 pb-16" id="cta">
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-700 px-6 py-12 shadow-sm sm:px-10">
@@ -24,12 +29,14 @@ export default function FinalCTA() {
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <Link
-                href="/booking"
+              <button
+                type="button"
+                onClick={redirectToBookingOrLogin}
                 className="inline-flex items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-slate-100"
               >
                 Book Now
-              </Link>
+              </button>
+
               <a
                 href="tel:+919876543210"
                 className="inline-flex items-center justify-center rounded-xl border border-white/20 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
