@@ -76,6 +76,7 @@ export type EstimatePricingPayload = {
   serviceType: "Driver Only" | "Car with Driver";
   carType?: "AC" | "Non-AC";
   estimatedHours?: number;
+  estimatedKm?: number;
   bookingDate: string;
   pickupTime: string;
   paymentMethod: "Cash" | "UPI" | "Card" | "Net Banking";
@@ -126,6 +127,108 @@ export async function estimatePricing(payload: EstimatePricingPayload) {
 
   return res.data;
 }
+
+export type LocationSuggestion = { id: number; label: string; latitude: number; longitude: number };
+export type LocationPoint = Pick<LocationSuggestion, "latitude" | "longitude">;
+
+export async function searchLocations(query: string) {
+  const token = getAuthToken();
+  const res = await api.get<{ success: boolean; data: LocationSuggestion[] }>("/locations/search", { params: { q: query }, headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+  return res.data.data;
+}
+
+export async function getRouteDistance(pickup: LocationPoint, drop: LocationPoint) {
+  const token = getAuthToken();
+  const res = await api.post<{ success: boolean; data: { distanceKm: number; durationMinutes: number } }>("/locations/distance", { pickup, drop }, { headers: token ? { Authorization: `Bearer ${token}` } : undefined });
+  return res.data.data;
+}
+
+export type AdminPricingResponse = {
+  success?: boolean;
+  data?: {
+    id?: string;
+    isActive?: boolean;
+    driverBaseFare?: number;
+    driverHourlyRate?: number;
+    driverExtraHourlyRate?: number;
+    driverMinimumHours?: number;
+    carDriverBaseFare?: number;
+    acRatePerKm?: number;
+    nonAcRatePerKm?: number;
+    minimumKm?: number;
+    extraKmCharge?: number;
+    driverAllowance?: number;
+    nightStay?: number;
+    tollCharge?: number;
+    stateTax?: number;
+    localBaseFare?: number;
+    localPerKmRate?: number;
+    waitingChargePerMinute?: number;
+    waitingGraceTimeMinutes?: number;
+    airportCharge?: number;
+    gstPercent?: number;
+    nightChargePercent?: number;
+    weekendChargePercent?: number;
+    minimumFare?: number;
+    nightChargeWindow?: { startHour?: number; endHour?: number };
+  };
+  message?: string;
+};
+
+export type AdminPricingUpdatePayload = {
+  driverBaseFare?: number;
+  driverHourlyRate?: number;
+  driverExtraHourlyRate?: number;
+  driverMinimumHours?: number;
+  carDriverBaseFare?: number;
+  acRatePerKm?: number;
+  nonAcRatePerKm?: number;
+  minimumKm?: number;
+  extraKmCharge?: number;
+  driverAllowance?: number;
+  nightStay?: number;
+  tollCharge?: number;
+  stateTax?: number;
+  localBaseFare?: number;
+  localPerKmRate?: number;
+  waitingChargePerMinute?: number;
+  waitingGraceTimeMinutes?: number;
+  airportCharge?: number;
+  gstPercent?: number;
+  nightChargePercent?: number;
+  weekendChargePercent?: number;
+  minimumFare?: number;
+  nightChargeWindow?: { startHour?: number; endHour?: number };
+};
+
+export async function getAdminPricing() {
+  const token = getAuthToken();
+  const res = await api.get<AdminPricingResponse>("/pricing", {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  return res.data;
+}
+
+export async function updateAdminPricing(payload: AdminPricingUpdatePayload) {
+  const token = getAuthToken();
+  console.log("[pricing] PUT /pricing payload", payload);
+  const res = await api.put<AdminPricingResponse>("/pricing", payload, {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  console.log("[pricing] PUT /pricing response", res.data);
+  return res.data;
+}
+
 
 export async function createBooking(payload: BookingPayload) {
   const token = getAuthToken();
@@ -479,5 +582,3 @@ export async function deleteCar(carId: string) {
 
   return res.data;
 }
-
-

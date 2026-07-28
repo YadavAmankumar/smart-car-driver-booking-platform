@@ -3,6 +3,7 @@ const {
   getDashboardStats,
   getAdminBookings,
   patchAdminBookingStatus,
+  getAdminCustomers, getAdminCustomerById, updateAdminCustomerStatus, deleteAdminCustomer,
 } = require("../controllers/adminController");
 const authMiddleware = require("../middleware/auth/authMiddleware");
 const authorizeRoles = require("../middleware/auth/authorizeRoles");
@@ -31,7 +32,10 @@ router.patch(
   authorizeRoles("admin"),
   patchAdminBookingStatus
 );
+router.get("/customers", authMiddleware, authorizeRoles("admin"), getAdminCustomers);
+router.get("/customers/:id", authMiddleware, authorizeRoles("admin"), getAdminCustomerById);
+router.patch("/customers/:id/status", authMiddleware, authorizeRoles("admin"), updateAdminCustomerStatus);
+router.delete("/customers/:id", authMiddleware, authorizeRoles("admin"), deleteAdminCustomer);
 
 module.exports = router;
-
 

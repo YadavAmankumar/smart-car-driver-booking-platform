@@ -19,6 +19,15 @@ const buildPricingResponse = (p) => {
     carDriverBaseFare: p.carDriverBaseFare,
     acRatePerKm: p.acRatePerKm,
     nonAcRatePerKm: p.nonAcRatePerKm,
+    minimumKm: p.minimumKm,
+    extraKmCharge: p.extraKmCharge,
+
+    driverAllowance: p.driverAllowance,
+    nightStay: p.nightStay,
+    tollCharge: p.tollCharge,
+    stateTax: p.stateTax,
+    localBaseFare: p.localBaseFare,
+    localPerKmRate: p.localPerKmRate,
 
     // Common
     waitingChargePerMinute: p.waitingChargePerMinute,
@@ -37,15 +46,10 @@ const buildPricingResponse = (p) => {
 exports.getPricing = asyncHandler(async (req, res) => {
   const pricing = await Pricing.findOne({ isActive: true }).sort({ createdAt: -1 });
 
-  // If missing, controller still returns defaults (created via service usually),
-  // but controller should be robust too.
   if (!pricing) {
-    const created = await Pricing.create({
-      isActive: true,
-    });
-    return res.status(200).json({
-      success: true,
-      data: buildPricingResponse(created),
+    return res.status(404).json({
+      success: false,
+      message: "No active pricing configuration found.",
     });
   }
 
@@ -58,56 +62,128 @@ exports.getPricing = asyncHandler(async (req, res) => {
 // Admin: PUT /api/v1/pricing
 exports.updatePricing = asyncHandler(async (req, res) => {
   const payload = req.body || {};
+  console.log("[pricing] PUT req.body", payload);
 
-  // Ensure only allowed fields are used.
-  // (We do not import express-validator to avoid changing dependencies.)
+  // A pricing edit always targets the existing active document. It never
+  // creates, replaces, or changes the document identity.
+  const active = await Pricing.findOne({ isActive: true }).sort({ createdAt: -1 });
+
+  if (!active) {
+    return res.status(404).json({
+      success: false,
+      message: "No active pricing configuration found.",
+    });
+  }
+
+  console.log("[pricing] Active pricing before update", active.toObject());
+
+  const [pricingDocumentCount, activePricingCount] = await Promise.all([
+    Pricing.countDocuments(),
+    Pricing.countDocuments({ isActive: true }),
+  ]);
+
+  if (pricingDocumentCount !== 1 || activePricingCount !== 1) {
+    return res.status(409).json({
+      success: false,
+      message: "Pricing collection integrity error: exactly one active pricing document is required.",
+    });
+  }
+
+  // Only allow pricing fields and retain the active document's value for any
+  // omitted field. This lets validation run without constructing a new model.
   const candidate = {
     // Driver only
-    driverBaseFare: payload.driverBaseFare,
-    driverHourlyRate: payload.driverHourlyRate,
-    driverExtraHourlyRate: payload.driverExtraHourlyRate,
-    driverMinimumHours: payload.driverMinimumHours,
+    driverBaseFare: payload.driverBaseFare ?? active.driverBaseFare,
+    driverHourlyRate: payload.driverHourlyRate ?? active.driverHourlyRate,
+    driverExtraHourlyRate:
+      payload.driverExtraHourlyRate ?? active.driverExtraHourlyRate,
+    driverMinimumHours: payload.driverMinimumHours ?? active.driverMinimumHours,
 
     // Car+driver
-    carDriverBaseFare: payload.carDriverBaseFare,
-    acRatePerKm: payload.acRatePerKm,
-    nonAcRatePerKm: payload.nonAcRatePerKm,
+    carDriverBaseFare: payload.carDriverBaseFare ?? active.carDriverBaseFare,
+    acRatePerKm: payload.acRatePerKm ?? active.acRatePerKm,
+    nonAcRatePerKm: payload.nonAcRatePerKm ?? active.nonAcRatePerKm,
+    minimumKm: payload.minimumKm ?? active.minimumKm,
+    extraKmCharge: payload.extraKmCharge ?? active.extraKmCharge,
+
+    driverAllowance: payload.driverAllowance ?? active.driverAllowance,
+    nightStay: payload.nightStay ?? active.nightStay,
+    tollCharge: payload.tollCharge ?? active.tollCharge,
+    stateTax: payload.stateTax ?? active.stateTax,
+    localBaseFare: payload.localBaseFare ?? active.localBaseFare,
+    localPerKmRate: payload.localPerKmRate ?? active.localPerKmRate,
 
     // Common
-    waitingChargePerMinute: payload.waitingChargePerMinute,
-    waitingGraceTimeMinutes: payload.waitingGraceTimeMinutes,
-    airportCharge: payload.airportCharge,
-    gstPercent: payload.gstPercent,
-    nightChargePercent: payload.nightChargePercent,
-    weekendChargePercent: payload.weekendChargePercent,
-    minimumFare: payload.minimumFare,
+    waitingChargePerMinute:
+      payload.waitingChargePerMinute ?? active.waitingChargePerMinute,
+    waitingGraceTimeMinutes:
+      payload.waitingGraceTimeMinutes ?? active.waitingGraceTimeMinutes,
+    airportCharge: payload.airportCharge ?? active.airportCharge,
+    gstPercent: payload.gstPercent ?? active.gstPercent,
+    nightChargePercent: payload.nightChargePercent ?? active.nightChargePercent,
+    weekendChargePercent:
+      payload.weekendChargePercent ?? active.weekendChargePercent,
+    minimumFare: payload.minimumFare ?? active.minimumFare,
 
-    nightChargeWindow: payload.nightChargeWindow,
+    nightChargeWindow: payload.nightChargeWindow ?? active.nightChargeWindow,
 
     isActive: true,
   };
 
-  // Build a document-like object for validation.
-  // Set defaults from schema by creating a temporary instance.
-  const temp = new Pricing(candidate);
+  validatePricingConfig(candidate);
 
-  // Normalize nightChargeWindow defaults
-  if (!temp.nightChargeWindow) {
-    temp.nightChargeWindow = { startHour: 22, endHour: 5 };
+  const activeId = active._id;
+  const updateValues = { ...candidate, isActive: true };
+  console.log("[pricing] active.set values", updateValues);
+  active.set(updateValues);
+  const saved = await active.save();
+  console.log("[pricing] Active pricing after save", saved.toObject());
+
+  if (!saved._id.equals(activeId)) {
+    throw new Error("Pricing update changed the active document identity");
   }
 
-  validatePricingConfig(temp.toObject());
+  const [savedDocumentCount, savedActiveCount] = await Promise.all([
+    Pricing.countDocuments(),
+    Pricing.countDocuments({ isActive: true }),
+  ]);
 
-  // Deactivate previous actives and create a new active doc (keeps history).
-  await Pricing.updateMany({ isActive: true }, { $set: { isActive: false } });
+  if (savedDocumentCount !== 1 || savedActiveCount !== 1) {
+    throw new Error("Pricing collection integrity changed during update");
+  }
 
-  const created = await Pricing.create({ ...candidate, isActive: true });
+  const persisted = await Pricing.findById(activeId);
+  if (!persisted) {
+    return res.status(500).json({
+      success: false,
+      message: "Pricing update could not be verified in MongoDB.",
+    });
+  }
+
+  console.log("[pricing] Pricing re-read from MongoDB", persisted.toObject());
+
+  const mismatchedFields = Object.entries(updateValues)
+    .filter(([field, value]) => {
+      const persistedValue = persisted.get(field);
+      return JSON.stringify(persistedValue) !== JSON.stringify(value);
+    })
+    .map(([field]) => field);
+
+  if (mismatchedFields.length > 0) {
+    console.error("[pricing] MongoDB verification mismatch", mismatchedFields);
+    return res.status(500).json({
+      success: false,
+      message: "Pricing update was not persisted to MongoDB.",
+      errors: mismatchedFields,
+    });
+  }
 
   res.status(200).json({
     success: true,
     message: "Pricing updated successfully.",
-    data: buildPricingResponse(created),
+    data: buildPricingResponse(persisted),
   });
+
 });
 
 // Customer: POST /api/v1/pricing/estimate
@@ -220,5 +296,3 @@ exports.estimateFare = asyncHandler(async (req, res) => {
     },
   });
 });
-
-

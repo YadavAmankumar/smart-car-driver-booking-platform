@@ -2,30 +2,6 @@ const Pricing = require("../models/Pricing");
 
 const DEFAULT_NIGHT_WINDOW = { startHour: 22, endHour: 5 }; // 22:00–05:00
 
-const buildDefaultPricingPayload = () => ({
-  // Driver Only
-  driverBaseFare: 300,
-  driverHourlyRate: 150,
-  driverExtraHourlyRate: 120,
-  driverMinimumHours: 4,
-
-  // Car + Driver
-  carDriverBaseFare: 250,
-  acRatePerKm: 21,
-  nonAcRatePerKm: 18,
-
-  // Common
-  waitingChargePerMinute: 2,
-  waitingGraceTimeMinutes: 15,
-  airportCharge: 200,
-  gstPercent: 5,
-  nightChargePercent: 10,
-  weekendChargePercent: 5,
-  minimumFare: 300,
-
-  nightChargeWindow: DEFAULT_NIGHT_WINDOW,
-});
-
 const isValidNumber = (n) => typeof n === "number" && Number.isFinite(n);
 
 const assertNonNegative = (value, field) => {
@@ -59,6 +35,15 @@ const validatePricingConfig = (p) => {
   assertNonNegative(p.carDriverBaseFare, "carDriverBaseFare");
   assertNonNegative(p.acRatePerKm, "acRatePerKm");
   assertNonNegative(p.nonAcRatePerKm, "nonAcRatePerKm");
+  assertPositive(p.minimumKm, "minimumKm");
+  assertNonNegative(p.extraKmCharge, "extraKmCharge");
+
+  assertNonNegative(p.driverAllowance, "driverAllowance");
+  assertNonNegative(p.nightStay, "nightStay");
+  assertNonNegative(p.tollCharge, "tollCharge");
+  assertNonNegative(p.stateTax, "stateTax");
+  assertNonNegative(p.localBaseFare, "localBaseFare");
+  assertNonNegative(p.localPerKmRate, "localPerKmRate");
 
   // Common
   assertNonNegativeOrZero(p.waitingChargePerMinute, "waitingChargePerMinute");
@@ -160,6 +145,14 @@ const calculateFare = async ({
     carDriverBaseFare: pricing.carDriverBaseFare,
     acRatePerKm: pricing.acRatePerKm,
     nonAcRatePerKm: pricing.nonAcRatePerKm,
+    minimumKm: pricing.minimumKm,
+    extraKmCharge: pricing.extraKmCharge,
+    driverAllowance: pricing.driverAllowance,
+    nightStay: pricing.nightStay,
+    tollCharge: pricing.tollCharge,
+    stateTax: pricing.stateTax,
+    localBaseFare: pricing.localBaseFare,
+    localPerKmRate: pricing.localPerKmRate,
     waitingChargePerMinute: pricing.waitingChargePerMinute,
     waitingGraceTimeMinutes: pricing.waitingGraceTimeMinutes,
     airportCharge: pricing.airportCharge,
@@ -228,7 +221,12 @@ const calculateFare = async ({
       ratePerKm = snapshot.nonAcRatePerKm;
     }
 
-    distanceCharge = distanceKm * ratePerKm;
+    const includedKm = snapshot.minimumKm;
+    const chargedKm = Math.max(distanceKm, includedKm);
+    const standardKm = Math.min(chargedKm, includedKm);
+    const extraKm = Math.max(0, chargedKm - includedKm);
+    distanceCharge =
+      standardKm * ratePerKm + extraKm * (ratePerKm + snapshot.extraKmCharge);
 
     // For now, estimatedDuration isn't derived from km (no duration model provided).
     // Leave as 0 to be compatible with future Google Directions integration.
@@ -304,11 +302,7 @@ const getActivePricing = async () => {
   const active = await Pricing.find({ isActive: true }).sort({ createdAt: -1 });
 
   if (!active || active.length === 0) {
-    const created = await Pricing.create({
-      ...buildDefaultPricingPayload(),
-      isActive: true,
-    });
-    return created;
+    throw new Error("No active pricing configuration found");
   }
 
   if (active.length > 1) {
@@ -330,4 +324,3 @@ module.exports = {
   validatePricingConfig,
   calculateFare,
 };
-

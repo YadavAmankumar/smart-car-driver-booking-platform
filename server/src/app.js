@@ -9,6 +9,7 @@ const driverRoutes = require("./routes/driverRoutes"); // <-- Added
 const adminRoutes = require("./routes/adminRoutes");
 const paymentRoutes = require("./routes/payment/paymentRoutes");
 const pricingRoutes = require("./routes/pricingRoutes");
+const locationRoutes = require("./routes/locationRoutes");
 
 
 const app = express();
@@ -37,6 +38,7 @@ app.use("/api/v1/drivers", driverRoutes); // <-- Added
 app.use("/api/v1/admin", adminRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/pricing", pricingRoutes);
+app.use("/api/v1/locations", locationRoutes);
 
 
 // 404 Handler
@@ -50,4 +52,3 @@ app.use((req, res) => {
 });
 
 module.exports = app;
-

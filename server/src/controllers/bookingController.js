@@ -37,59 +37,41 @@ exports.createBooking = asyncHandler(async (req, res) => {
     waitingMinutes: 0, // always 0 at booking creation
   });
 
-  const booking = await Booking.create({
-    customerName,
-    mobileNumber,
-    customer: req.user?._id || null,
-    serviceType,
-    carType,
-    pickupLocation,
-    dropLocation,
-    bookingDate,
-    pickupTime,
-    estimatedHours,
-    estimatedKm,
-    paymentMethod,
-    notes,
+  const session = await Booking.startSession();
+  let booking;
 
-    // Pricing engine outputs
-    pricingSnapshot: fareResult.pricingSnapshot,
+  try {
+    await session.withTransaction(async () => {
+      [booking] = await Booking.create([{
+        customerName, mobileNumber, customer: req.user?._id || null,
+        serviceType, carType, pickupLocation, dropLocation, bookingDate,
+        pickupTime, estimatedHours, estimatedKm, paymentMethod, notes,
+        pricingSnapshot: fareResult.pricingSnapshot,
+        baseFare: fareResult.baseFare, ratePerKm: fareResult.ratePerKm,
+        hourlyRate: fareResult.hourlyRate, gst: fareResult.gst,
+        airportCharge: fareResult.airportCharge, waitingCharge: fareResult.waitingCharge,
+        nightCharge: fareResult.nightCharge, weekendCharge: fareResult.weekendCharge,
+        minimumFare: fareResult.minimumFare, distanceKm: fareResult.distanceKm,
+        estimatedDuration: fareResult.estimatedDuration, distanceCharge: fareResult.distanceCharge,
+        estimatedFare: fareResult.estimatedFare, rate: fareResult.baseFare,
+        totalAmount: fareResult.estimatedFare,
+      }], { session });
 
-    baseFare: fareResult.baseFare,
-    ratePerKm: fareResult.ratePerKm,
-    hourlyRate: fareResult.hourlyRate,
+      // Booking retains the customer's selected method; Payment tracks its
+      // settlement channel, where UPI/Card/Net Banking are all online.
+      const paymentMethodForSettlement = paymentMethod === "Cash" ? "Cash" : "Online";
+      const [payment] = await Payment.create([{
+        bookingId: booking._id, customerId: req.user?._id || null,
+        driverId: booking.driver || null, amount: booking.totalAmount,
+        paymentMethod: paymentMethodForSettlement, paymentStatus: "Pending",
+      }], { session });
 
-    gst: fareResult.gst,
-    airportCharge: fareResult.airportCharge,
-    waitingCharge: fareResult.waitingCharge,
-    nightCharge: fareResult.nightCharge,
-    weekendCharge: fareResult.weekendCharge,
-    minimumFare: fareResult.minimumFare,
-
-    distanceKm: fareResult.distanceKm,
-    estimatedDuration: fareResult.estimatedDuration,
-
-    distanceCharge: fareResult.distanceCharge,
-
-    estimatedFare: fareResult.estimatedFare,
-
-    // Backward compatibility fields
-    rate: fareResult.baseFare,
-    totalAmount: fareResult.estimatedFare,
-  });
-
-  // Create initial (Pending) payment and link it to the booking
-  const payment = await Payment.create({
-    bookingId: booking._id,
-    customerId: req.user?._id || null,
-    driverId: booking.driver || null,
-    amount: booking.totalAmount,
-    paymentMethod: booking.paymentMethod,
-    paymentStatus: "Pending",
-  });
-
-  booking.payment = payment._id;
-  await booking.save();
+      booking.payment = payment._id;
+      await booking.save({ session });
+    });
+  } finally {
+    await session.endSession();
+  }
 
   res.status(201).json({
     success: true,
@@ -311,4 +293,3 @@ exports.getBookingStats = asyncHandler(async (req, res) => {
     data: stats,
   });
 });
-

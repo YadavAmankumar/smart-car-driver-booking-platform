@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createBooking,
   estimatePricing,
+  getRouteDistance,
   parseBackendValidationErrors,
+  searchLocations,
   type FareBreakdown,
   type EstimatePricingPayload,
   type EstimatePricingResponse,
+  type LocationSuggestion,
 } from "@/lib/api";
 import toast from "react-hot-toast";
 import {
@@ -77,9 +80,8 @@ function formatMoney(amount?: number) {
 function coercePositiveInt(v: unknown): number | undefined {
   const n = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n)) return undefined;
-  const i = Math.floor(n);
-  if (i < 1) return undefined;
-  return i;
+  if (n <= 0) return undefined;
+  return n;
 }
 
 type SelectCardProps = {
@@ -149,12 +151,12 @@ export default function BookingForm() {
 
     carType: "AC",
     estimatedHours: 1,
-    estimatedKm: 1,
+    estimatedKm: undefined,
     paymentMethod: "Cash",
   });
 
   const [inlineErrors, setInlineErrors] = useState<InlineErrors>({});
-  const [isPending, startTransition] = useTransition();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [bookingSuccess, setBookingSuccess] = useState<BookingSuccess | null>(
@@ -172,9 +174,17 @@ export default function BookingForm() {
   const [estimatedDuration, setEstimatedDuration] = useState<number | null>(
     null,
   );
+  const [pickupSuggestions, setPickupSuggestions] = useState<LocationSuggestion[]>([]);
+  const [dropSuggestions, setDropSuggestions] = useState<LocationSuggestion[]>([]);
+  const [pickupSelected, setPickupSelected] = useState<LocationSuggestion | null>(null);
+  const [dropSelected, setDropSelected] = useState<LocationSuggestion | null>(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routeDuration, setRouteDuration] = useState<number | null>(null);
 
   const debounceTimerRef = useRef<number | null>(null);
   const activeRequestIdRef = useRef(0);
+  const submissionRef = useRef(false);
 
   const vehicleType = values.vehicleType;
 
@@ -187,11 +197,13 @@ export default function BookingForm() {
         ? Math.max(1, Number(values.numberOfPassengers) || 1)
         : undefined;
 
-    // Distance (km) is not user-entered in this UI (no maps yet).
-    const estimatedKm = undefined;
+    const estimatedKm =
+      values.serviceType === "Car with Driver"
+        ? coercePositiveInt(values.estimatedKm)
+        : undefined;
 
     return { carType, estimatedHours, estimatedKm };
-  }, [values.numberOfPassengers, values.serviceType, vehicleType]);
+  }, [values.estimatedKm, values.numberOfPassengers, values.serviceType, vehicleType]);
 
   function validateClientSide(next: BookingFormValues): InlineErrors {
     const e: InlineErrors = {};
@@ -233,7 +245,7 @@ export default function BookingForm() {
 
     if (next.serviceType === "Car with Driver") {
       if (!derived.estimatedKm || derived.estimatedKm < 1) {
-        e.numberOfPassengers = "Estimated kilometers are required";
+        e.estimatedKm = "Estimated kilometers must be greater than 0";
       }
     }
 
@@ -251,16 +263,41 @@ export default function BookingForm() {
     setSuccessVisible(false);
   }
 
-  const pricingInputsReady =
+  function changeLocation(field: "pickupLocation" | "dropLocation", value: string) {
+    setField(field, value);
+    if (field === "pickupLocation") { setPickupSelected(null); setPickupSuggestions([]); } else { setDropSelected(null); setDropSuggestions([]); }
+    setValues((current) => ({ ...current, estimatedKm: undefined }));
+    setRouteDuration(null); setRouteError(null); setFareBreakdown(null); setEstimatedTotal(null);
+  }
+
+  useEffect(() => {
+    const query = pickupSelected ? values.dropLocation : values.pickupLocation;
+    const setSuggestions = pickupSelected ? setDropSuggestions : setPickupSuggestions;
+    if (query.trim().length < 3) return;
+    const timer = window.setTimeout(() => { void searchLocations(query).then(setSuggestions).catch(() => setRouteError("Unable to search locations. Please try again.")); }, 400);
+    return () => window.clearTimeout(timer);
+  }, [values.pickupLocation, values.dropLocation, pickupSelected]);
+
+  useEffect(() => {
+    if (values.serviceType !== "Car with Driver" || !pickupSelected || !dropSelected) return;
+    let active = true;
+    queueMicrotask(() => { if (active) { setRouteLoading(true); setRouteError(null); } });
+    void getRouteDistance(pickupSelected, dropSelected).then((route) => { if (active) { setField("estimatedKm", route.distanceKm); setRouteDuration(route.durationMinutes); } }).catch(() => { if (active) setRouteError("Unable to calculate a driving route for these locations."); }).finally(() => { if (active) setRouteLoading(false); });
+    return () => { active = false; };
+  }, [values.serviceType, pickupSelected, dropSelected]);
+
+  const commonPricingInputsReady =
     values.pickupLocation.trim().length > 0 &&
     values.dropLocation.trim().length > 0 &&
     !!values.pickupDate &&
     values.pickupTime.trim().length > 0 &&
     !!values.paymentMethod &&
-    !!values.serviceType &&
-    values.serviceType === "Driver Only"
+    !!values.serviceType && !!pickupSelected && !!dropSelected;
+  const pricingInputsReady =
+    commonPricingInputsReady &&
+    (values.serviceType === "Driver Only"
       ? (coercePositiveInt(derived.estimatedHours) ?? 0) >= 1
-      : true;
+      : (coercePositiveInt(derived.estimatedKm) ?? 0) >= 1 && !routeLoading);
 
     const pricingSucceeded =
     estimateError == null && !estimateLoading && estimatedTotal != null;
@@ -274,6 +311,7 @@ export default function BookingForm() {
       serviceType: values.serviceType,
       carType: derived.carType,
       estimatedHours: derived.estimatedHours,
+      estimatedKm: derived.estimatedKm,
       bookingDate: values.pickupDate,
       pickupTime: values.pickupTime.trim(),
       // Backend expects "Cash" | "UPI" | "Card" | "Net Banking".
@@ -281,20 +319,11 @@ export default function BookingForm() {
       paymentMethod: values.paymentMethod === "Cash" ? "Cash" : "UPI",
     };
 
-    // Backend typing expects estimatedHours only for Driver Only.
-    // For Car with Driver, backend likely uses estimatedKm but the payload typing here may not include it.
-    // We keep payload flexible by attaching estimatedKm if present.
-    // Distance (km) is not user-entered in this UI (no maps yet).
-    // Keep request payload compatible with backend even if TypeScript typing is stricter.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const payload: any = {
-      ...base,
-    };
-
-    return payload;
+    return base;
   }, [
     derived.carType,
     derived.estimatedHours,
+    derived.estimatedKm,
     values.dropLocation,
     values.paymentMethod,
     values.pickupDate,
@@ -340,9 +369,7 @@ export default function BookingForm() {
         );
 
         setEstimatedDuration(
-          typeof data?.estimatedDuration === "number"
-            ? data?.estimatedDuration
-            : null,
+          routeDuration ?? (typeof data?.estimatedDuration === "number" ? data.estimatedDuration : null),
         );
 
         setEstimateLoading(false);
@@ -358,10 +385,11 @@ export default function BookingForm() {
         window.clearTimeout(debounceTimerRef.current);
       }
     };
-  }, [pricingInputsReady, pricingPayload]);
+  }, [pricingInputsReady, pricingPayload, routeDuration]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submissionRef.current) return;
     setSubmitError(null);
 
     const nextInline = validateClientSide(values);
@@ -389,17 +417,17 @@ export default function BookingForm() {
       bookingDate: values.pickupDate,
       pickupTime: values.pickupTime.trim(),
       estimatedHours: derived.estimatedHours,
-      // No manual distance input yet.
-      estimatedKm: undefined,
+      estimatedKm: derived.estimatedKm,
       paymentMethod: backendPaymentMethod,
       notes: values.specialInstructions.trim() || undefined,
     } as const;
 
-    startTransition(async () => {
-      try {
-        if (estimateLoading) return;
-        const res = await createBooking(payload);
-        if (res?.success) {
+    if (estimateLoading) return;
+    submissionRef.current = true;
+    setIsSubmitting(true);
+    try {
+      const res = await createBooking(payload);
+      if (res.success && res.data) {
           const data = res.data as
             | {
                 _id?: string;
@@ -437,13 +465,15 @@ export default function BookingForm() {
             specialInstructions: "",
             carType: "AC",
             estimatedHours: 1,
-            estimatedKm: 1,
+            estimatedKm: undefined,
             paymentMethod: "Cash",
           });
 
-          setInlineErrors({});
-        }
-      } catch (err) {
+        setInlineErrors({});
+        return;
+      }
+      throw new Error(res.message || "Booking could not be created.");
+    } catch (err) {
         const backendErrors = parseBackendValidationErrors(err);
         if (backendErrors.length) {
           const mapped: Record<string, string> = {};
@@ -460,6 +490,7 @@ export default function BookingForm() {
             pickupTime: mapped.pickupTime,
             serviceType: mapped.serviceType,
             vehicleType: mapped.carType,
+            estimatedKm: mapped.estimatedKm,
           };
 
           setInlineErrors((prev) => ({ ...prev, ...uiMapped }));
@@ -470,11 +501,13 @@ export default function BookingForm() {
 
         setSubmitError("Something went wrong. Please try again.");
         toast.error("Something went wrong. Please try again.");
-      }
-    });
+    } finally {
+      submissionRef.current = false;
+      setIsSubmitting(false);
+    }
   }
 
-  const confirmDisabled = isPending || estimateLoading || !pricingSucceeded;
+  const confirmDisabled = isSubmitting || estimateLoading || !pricingSucceeded;
 
 
   if (bookingSuccess && successVisible) {
@@ -656,10 +689,8 @@ export default function BookingForm() {
                   </label>
                   <Input
                     value={values.pickupLocation}
-                    onChange={(ev) =>
-                      setField("pickupLocation", ev.target.value)
-                    }
-                    placeholder="City, Address"
+                    onChange={(ev) => changeLocation("pickupLocation", ev.target.value)}
+                    placeholder="Search pickup location"
                     aria-invalid={!!inlineErrors.pickupLocation}
                   />
                   {inlineErrors.pickupLocation ? (
@@ -667,6 +698,7 @@ export default function BookingForm() {
                       {inlineErrors.pickupLocation}
                     </p>
                   ) : null}
+                  {!pickupSelected && pickupSuggestions.length > 0 ? <div className="mt-2 max-h-40 overflow-auto rounded-md border border-slate-200 bg-white shadow-sm">{pickupSuggestions.map((location) => <button key={location.id} type="button" className="block w-full px-3 py-2 text-left text-xs hover:bg-slate-50" onClick={() => { setPickupSelected(location); setField("pickupLocation", location.label); setPickupSuggestions([]); }}>{location.label}</button>)}</div> : null}
                 </div>
 
                 <div>
@@ -675,8 +707,8 @@ export default function BookingForm() {
                   </label>
                   <Input
                     value={values.dropLocation}
-                    onChange={(ev) => setField("dropLocation", ev.target.value)}
-                    placeholder="City, Address"
+                    onChange={(ev) => changeLocation("dropLocation", ev.target.value)}
+                    placeholder="Search drop location"
                     aria-invalid={!!inlineErrors.dropLocation}
                   />
                   {inlineErrors.dropLocation ? (
@@ -684,6 +716,7 @@ export default function BookingForm() {
                       {inlineErrors.dropLocation}
                     </p>
                   ) : null}
+                  {!dropSelected && dropSuggestions.length > 0 ? <div className="mt-2 max-h-40 overflow-auto rounded-md border border-slate-200 bg-white shadow-sm">{dropSuggestions.map((location) => <button key={location.id} type="button" className="block w-full px-3 py-2 text-left text-xs hover:bg-slate-50" onClick={() => { setDropSelected(location); setField("dropLocation", location.label); setDropSuggestions([]); }}>{location.label}</button>)}</div> : null}
                 </div>
 
                 <div>
@@ -774,6 +807,23 @@ export default function BookingForm() {
                     {inlineErrors.numberOfPassengers ? (
                       <p className="mt-1 text-sm text-[#DC2626]" role="alert">
                         {inlineErrors.numberOfPassengers}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {values.serviceType === "Car with Driver" ? (
+                  <div className="md:col-span-2">
+                    <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                      Route distance
+                    </label>
+                    <Input
+                      readOnly
+                      value={routeLoading ? "Calculating route…" : values.estimatedKm ? `${values.estimatedKm} KM${routeDuration ? ` · ~${routeDuration} min` : ""}` : "Select pickup and drop locations"}
+                    />
+                    {routeError || inlineErrors.estimatedKm ? (
+                      <p className="mt-1 text-sm text-[#DC2626]" role="alert">
+                        {routeError || inlineErrors.estimatedKm}
                       </p>
                     ) : null}
                   </div>
@@ -886,7 +936,7 @@ export default function BookingForm() {
                   {confirmDisabled ? (
                     <span className="inline-flex items-center gap-2">
                       <LoadingSpinner />
-                      {isPending ? "Booking..." : "Estimating..."}
+                      {isSubmitting ? "Booking..." : "Estimating..."}
                     </span>
                   ) : (
                     "Book Now"

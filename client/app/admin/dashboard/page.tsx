@@ -155,7 +155,7 @@ export default function AdminDashboardPage() {
 
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <ActionButton title="Create Booking" subtitle="Add new trip" />
-                  <ActionButton title="Manage Fleet" subtitle="Cars & maintenance" />
+                <ActionButton title="Pricing" subtitle="Manage fare rates" />
                   <ActionButton title="Driver Dispatch" subtitle="Assign available drivers" />
                   <ActionButton title="View Payments" subtitle="Review pending invoices" />
                 </div>

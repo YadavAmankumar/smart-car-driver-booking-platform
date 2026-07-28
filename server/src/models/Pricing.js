@@ -32,6 +32,17 @@ const pricingSchema = new mongoose.Schema(
     carDriverBaseFare: { type: Number, required: true, min: 0, default: 250 },
     acRatePerKm: { type: Number, required: true, min: 0, default: 21 },
     nonAcRatePerKm: { type: Number, required: true, min: 0, default: 18 },
+    minimumKm: { type: Number, required: true, min: 1, default: 1 },
+    extraKmCharge: { type: Number, required: true, min: 0, default: 0 },
+
+    // Retained as configurable rates for the existing admin pricing screen.
+    // They are not applied until the booking flow supports Local/Outstation trips.
+    driverAllowance: { type: Number, required: true, min: 0, default: 0 },
+    nightStay: { type: Number, required: true, min: 0, default: 0 },
+    tollCharge: { type: Number, required: true, min: 0, default: 0 },
+    stateTax: { type: Number, required: true, min: 0, default: 0 },
+    localBaseFare: { type: Number, required: true, min: 0, default: 0 },
+    localPerKmRate: { type: Number, required: true, min: 0, default: 0 },
 
     // ==============================
     // Common
@@ -70,4 +81,3 @@ pricingSchema.index(
 );
 
 module.exports = mongoose.model("Pricing", pricingSchema);
-

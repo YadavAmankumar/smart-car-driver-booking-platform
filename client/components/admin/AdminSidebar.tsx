@@ -24,7 +24,7 @@ export default function AdminSidebar() {
     { label: "Bookings", href: "/admin/bookings" },
     { label: "Cars", href: "/admin/cars" },
     { label: "Drivers", href: "/admin/drivers" },
-    { label: "Customers", comingSoon: true },
+    { label: "Customers", href: "/admin/customers" },
     { label: "Payments", href: "/admin/payments" },
     { label: "Pricing", href: "/admin/pricing" },
     { label: "Analytics", comingSoon: true },
@@ -80,4 +80,3 @@ export default function AdminSidebar() {
     </aside>
   );
 }
-
