@@ -6,11 +6,9 @@ const authMiddleware = async (req, res, next) => {
     let token;
 
     // Check Authorization Header
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith("Bearer")
-    ) {
-      token = req.headers.authorization.split(" ")[1];
+    if (typeof req.headers.authorization === "string") {
+      const [scheme, value, ...extra] = req.headers.authorization.trim().split(/\s+/);
+      if (scheme === "Bearer" && value && extra.length === 0) token = value;
     }
 
     // Token not found
@@ -33,8 +31,11 @@ const authMiddleware = async (req, res, next) => {
         message: "User not found.",
       });
     }
-    if (user.status === "blocked") {
-      return res.status(403).json({ success: false, message: "Your account has been blocked." });
+    if (user.status !== "active") {
+      return res.status(403).json({
+        success: false,
+        message: "Your account is not active.",
+      });
     }
 
     // Attach User to Request

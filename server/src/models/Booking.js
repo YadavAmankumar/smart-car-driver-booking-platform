@@ -112,12 +112,12 @@ const bookingSchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       required: [true, "Payment method is required"],
-      enum: ["Cash", "UPI", "Card", "Net Banking"],
+      enum: ["Cash", "UPI"],
     },
 
     paymentStatus: {
       type: String,
-      enum: ["Pending", "Paid", "Refunded"],
+      enum: ["Pending", "Verification Pending", "Paid", "Rejected", "Cancelled", "Refunded"],
       default: "Pending",
     },
 
@@ -132,6 +132,20 @@ const bookingSchema = new mongoose.Schema(
       ],
       default: "Pending",
     },
+
+    statusHistory: [{
+      from: { type: String, enum: ["Pending", "Confirmed", "Ongoing", "Completed", "Cancelled"] },
+      to: { type: String, enum: ["Pending", "Confirmed", "Ongoing", "Completed", "Cancelled"], required: true },
+      changedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      changedAt: { type: Date, default: Date.now },
+      reason: { type: String, trim: true, maxlength: 500, default: "" },
+    }],
+
+    cancelledAt: { type: Date, default: null },
+    cancelledBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    cancellationReason: { type: String, trim: true, maxlength: 500, default: "" },
+    startedAt: { type: Date, default: null },
+    completedAt: { type: Date, default: null },
 
     driver: {
       type: mongoose.Schema.Types.ObjectId,
@@ -169,5 +183,8 @@ const bookingSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Booking", bookingSchema);
+// Ownership and assigned-driver queries are used by protected booking reads.
+bookingSchema.index({ customer: 1, createdAt: -1 });
+bookingSchema.index({ driver: 1, createdAt: -1 });
 
+module.exports = mongoose.model("Booking", bookingSchema);

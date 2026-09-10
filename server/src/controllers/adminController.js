@@ -6,6 +6,11 @@ const Car = require("../models/Car");
 const User = require("../models/User");
 
 const asyncHandler = require("../utils/asyncHandler");
+const {
+  BookingLifecycleError,
+  refreshResourceAvailability,
+  transitionBooking,
+} = require("../services/bookingLifecycleService");
 
 const escapeRegex = (value) => {
   return String(value).replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
@@ -14,6 +19,7 @@ const escapeRegex = (value) => {
 const ALLOWED_BOOKING_STATUSES = [
   "Pending",
   "Confirmed",
+  "Ongoing",
   "Completed",
   "Cancelled",
 ];
@@ -219,8 +225,16 @@ exports.patchAdminBookingStatus = asyncHandler(async (req, res) => {
     });
   }
 
-  booking.bookingStatus = bookingStatus;
+  try {
+    transitionBooking(booking, bookingStatus, req.user._id, "Status updated by admin");
+  } catch (error) {
+    if (error instanceof BookingLifecycleError) {
+      return res.status(error.statusCode || 409).json({ success: false, message: error.message });
+    }
+    throw error;
+  }
   await booking.save();
+  await refreshResourceAvailability(booking);
 
   const updatedBooking = await Booking.findById(id)
     .populate("driver")
@@ -232,4 +246,3 @@ exports.patchAdminBookingStatus = asyncHandler(async (req, res) => {
     data: updatedBooking,
   });
 });
-

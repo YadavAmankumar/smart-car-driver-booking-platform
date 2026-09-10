@@ -7,7 +7,9 @@ const {
   updateBooking,
   deleteBooking,
   assignDriver,
+  cancelCustomerBooking,
   getCustomerBookings,
+  getDriverBookings,
   getAllBookings,
   getBookingStats,
 } = require("../controllers/bookingController");
@@ -36,6 +38,22 @@ router.get(
   authMiddleware,
   authorizeRoles("customer"),
   getCustomerBookings
+);
+
+// Customer cancellation keeps the booking record and enforces ownership.
+router.post(
+  "/:id/cancel",
+  authMiddleware,
+  authorizeRoles("customer"),
+  cancelCustomerBooking
+);
+
+// Get bookings assigned to the logged-in driver
+router.get(
+  "/driver",
+  authMiddleware,
+  authorizeRoles("driver"),
+  getDriverBookings
 );
 
 // ===============================
@@ -96,6 +114,7 @@ router.delete(
 router.get(
   "/:id",
   authMiddleware,
+  authorizeRoles("customer", "driver", "admin"),
   getBookingById
 );
 

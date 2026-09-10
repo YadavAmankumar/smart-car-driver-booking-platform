@@ -3,130 +3,109 @@ const mongoose = require("mongoose");
 const Payment = require("../../models/Payment");
 const Booking = require("../../models/Booking");
 const Driver = require("../../models/Driver");
-
 const asyncHandler = require("../../utils/asyncHandler");
 
-// ===============================
-// Helper: Find Driver by User
-// ===============================
-const findDriverByUser = async (user) => {
-  return await Driver.findOne({ phoneNumber: user.phone });
+const UTR_PATTERN = /^[A-Za-z0-9/-]{8,35}$/;
+
+const findDriverByUser = (user) => Driver.findOne({ user: user._id });
+
+const syncBookingPayment = (payment, status) =>
+  Booking.findByIdAndUpdate(payment.bookingId, { paymentStatus: status });
+
+const refreshPaymentAmount = async (payment) => {
+  const booking = await Booking.findById(payment.bookingId).select("totalAmount customer driver bookingStatus");
+  if (!booking) return null;
+  payment.amount = booking.totalAmount;
+  return booking;
 };
 
-// ===============================
-// Driver Payment APIs
-// ===============================
+const paymentPopulate = (query) => query
+  .populate("bookingId")
+  .populate("customerId", "name email phone")
+  .populate("driverId", "driverName phoneNumber")
+  .populate("verifiedBy", "name email driverName");
 
-// @desc    Get driver's assigned payments
-// @route   GET /api/v1/payments/driver
-// @access  Driver
-exports.getDriverPayments = asyncHandler(async (req, res) => {
-  const driver = await findDriverByUser(req.user);
+const sanitizeUtr = (value) => String(value || "").trim().toUpperCase();
 
-  if (!driver) {
-    return res.status(404).json({
-      success: false,
-      message: "Driver profile not found.",
-    });
-  }
+const validatePaymentId = (id, res) => {
+  if (mongoose.Types.ObjectId.isValid(id)) return true;
+  res.status(400).json({
+    success: false,
+    message: "Invalid payment id.",
+    errors: [{ field: "id", message: "Invalid ObjectId" }],
+  });
+  return false;
+};
 
-  const payments = await Payment.find({ driverId: driver._id })
-    .populate("bookingId")
-    .populate("customerId", "name email phone")
-    .populate("verifiedBy", "driverName")
-    .sort({ createdAt: -1 });
-
+exports.getPaymentConfig = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
-    count: payments.length,
-    data: payments,
+    data: {
+      upiId: process.env.BUSINESS_UPI_ID || "",
+      upiQrImageUrl: process.env.BUSINESS_UPI_QR_URL || "",
+      payeeName: process.env.BUSINESS_UPI_PAYEE_NAME || "Smart Car Driver Booking",
+    },
   });
 });
 
-// @desc    Mark cash as collected
-// @route   PUT /api/v1/payments/:id/cash-collected
-// @access  Driver
+exports.getDriverPayments = asyncHandler(async (req, res) => {
+  const driver = await findDriverByUser(req.user);
+  if (!driver) return res.status(404).json({ success: false, message: "Driver profile not found." });
+
+  const payments = await paymentPopulate(Payment.find({ driverId: driver._id })).sort({ createdAt: -1 });
+  res.status(200).json({ success: true, count: payments.length, data: payments });
+});
+
 exports.markCashCollected = asyncHandler(async (req, res) => {
   const { id } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid payment id.",
-      errors: [{ field: "id", message: "Invalid ObjectId" }],
-    });
-  }
+  if (!validatePaymentId(id, res)) return;
 
   const driver = await findDriverByUser(req.user);
-
-  if (!driver) {
-    return res.status(404).json({
-      success: false,
-      message: "Driver profile not found.",
-    });
-  }
+  if (!driver) return res.status(404).json({ success: false, message: "Driver profile not found." });
 
   const payment = await Payment.findById(id);
+  if (!payment) return res.status(404).json({ success: false, message: "Payment not found." });
 
-  if (!payment) {
-    return res.status(404).json({
+  if (payment.paymentMethod !== "Cash") {
+    return res.status(400).json({ success: false, message: "Only cash payments can be collected by a driver." });
+  }
+  if (!payment.driverId || !payment.driverId.equals(driver._id)) {
+    return res.status(403).json({ success: false, message: "Only the assigned driver can verify this payment." });
+  }
+  if (payment.paymentStatus !== "Pending") {
+    return res.status(409).json({ success: false, message: "This payment cannot be marked collected." });
+  }
+
+  const booking = await refreshPaymentAmount(payment);
+  if (!booking || booking.bookingStatus !== "Completed" || !booking.driver?.equals(driver._id)) {
+    return res.status(409).json({
       success: false,
-      message: "Payment not found.",
+      message: "Cash can only be collected by the assigned driver after a completed booking.",
     });
   }
 
-  // Only assigned driver can verify
-  if (payment.driverId.toString() !== driver._id.toString()) {
-    return res.status(403).json({
-      success: false,
-      message:
-        "Access denied. Only the assigned driver can verify this payment.",
-    });
-  }
-
-  if (payment.paymentStatus === "Paid") {
-    return res.status(400).json({
-      success: false,
-      message: "Payment is already marked as paid.",
-    });
-  }
-
+  const now = new Date();
   payment.paymentStatus = "Paid";
+  payment.verificationStatus = "Approved";
   payment.verifiedBy = driver._id;
+  payment.verifiedByModel = "Driver";
   payment.verifiedType = "Cash Collection";
-  payment.verifiedAt = new Date();
+  payment.verifiedAt = now;
+  payment.paidAt = now;
   await payment.save();
+  await syncBookingPayment(payment, "Paid");
 
-  // Sync payment status to booking
-  await Booking.findByIdAndUpdate(payment.bookingId, {
-    paymentStatus: "Paid",
-  });
-
-  const updatedPayment = await Payment.findById(id)
-    .populate("bookingId")
-    .populate("customerId", "name email phone")
-    .populate("verifiedBy", "driverName");
-
+  const updatedPayment = await paymentPopulate(Payment.findById(id));
   res.status(200).json({
     success: true,
     message: "Cash collected successfully. Payment marked as paid.",
     data: updatedPayment,
   });
 });
-
-// @desc    Approve online payment
-// @route   PUT /api/v1/payments/:id/approve
-// @access  Driver
-exports.approveOnlinePayment = asyncHandler(async (req, res) => {
+exports.confirmDriverOnlinePayment = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid payment id.",
-      errors: [{ field: "id", message: "Invalid ObjectId" }],
-    });
-  }
+  if (!validatePaymentId(id, res)) return;
 
   const driver = await findDriverByUser(req.user);
 
@@ -146,72 +125,204 @@ exports.approveOnlinePayment = asyncHandler(async (req, res) => {
     });
   }
 
-  // Only assigned driver can verify
-  if (payment.driverId.toString() !== driver._id.toString()) {
-    return res.status(403).json({
-      success: false,
-      message:
-        "Access denied. Only the assigned driver can verify this payment.",
-    });
-  }
-
-  if (payment.paymentStatus === "Paid") {
+  if (payment.paymentMethod !== "UPI") {
     return res.status(400).json({
       success: false,
-      message: "Payment is already marked as paid.",
+      message: "Only UPI payments can be confirmed as online payment.",
     });
   }
 
+  if (!payment.driverId || !payment.driverId.equals(driver._id)) {
+    return res.status(403).json({
+      success: false,
+      message: "Only the assigned driver can confirm this payment.",
+    });
+  }
+
+  if (!["Pending", "Verification Pending"].includes(payment.paymentStatus)) {
+    return res.status(409).json({
+      success: false,
+      message: "This UPI payment cannot be confirmed now.",
+    });
+  }
+
+  const booking = await refreshPaymentAmount(payment);
+
+  if (!booking) {
+    return res.status(404).json({
+      success: false,
+      message: "Linked booking not found.",
+    });
+  }
+
+  if (
+    booking.bookingStatus !== "Completed" ||
+    !booking.driver ||
+    !booking.driver.equals(driver._id)
+  ) {
+    return res.status(409).json({
+      success: false,
+      message:
+        "Online payment can only be confirmed by the assigned driver after a completed booking.",
+    });
+  }
+
+  const now = new Date();
+
+  payment.amount = booking.totalAmount;
   payment.paymentStatus = "Paid";
+  payment.verificationStatus = "Approved";
   payment.verifiedBy = driver._id;
-  payment.verifiedType = "Online Verification";
-  payment.verifiedAt = new Date();
+  payment.verifiedByModel = "Driver";
+  payment.verifiedType = "UPI Driver Confirmation";
+  payment.verifiedAt = now;
+  payment.paidAt = now;
+
   await payment.save();
 
-  // Sync payment status to booking
-  await Booking.findByIdAndUpdate(payment.bookingId, {
-    paymentStatus: "Paid",
-  });
+  await syncBookingPayment(payment, "Paid");
 
-  const updatedPayment = await Payment.findById(id)
-    .populate("bookingId")
-    .populate("customerId", "name email phone")
-    .populate("verifiedBy", "driverName");
+  const updatedPayment = await paymentPopulate(Payment.findById(id));
 
   res.status(200).json({
     success: true,
-    message: "Online payment approved successfully. Payment marked as paid.",
+    message: "Online payment confirmed successfully. Payment marked as paid.",
     data: updatedPayment,
   });
 });
 
-// ===============================
-// Customer Payment APIs
-// ===============================
+exports.submitUpiUtr = asyncHandler(async (req, res) => {
+  const { bookingId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+    return res.status(400).json({ success: false, message: "Invalid booking id." });
+  }
 
-// @desc    Get customer's payment history
-// @route   GET /api/v1/payments/customer
-// @access  Customer
-exports.getCustomerPayments = asyncHandler(async (req, res) => {
-  const payments = await Payment.find({ customerId: req.user._id })
-    .populate("bookingId")
-    .populate("driverId", "driverName phoneNumber")
-    .populate("verifiedBy", "driverName")
-    .sort({ createdAt: -1 });
+  const transactionId = sanitizeUtr(req.body?.transactionId || req.body?.utr);
+  if (!UTR_PATTERN.test(transactionId)) {
+    return res.status(400).json({
+      success: false,
+      message: "Enter a valid UPI transaction ID/UTR.",
+      errors: [{ field: "transactionId", message: "UTR must be 8-35 letters, numbers, slash, or hyphen characters." }],
+    });
+  }
 
-  res.status(200).json({
+  const [booking, payment] = await Promise.all([
+    Booking.findOne({ _id: bookingId, customer: req.user._id }),
+    Payment.findOne({ bookingId, customerId: req.user._id }),
+  ]);
+
+  if (!booking || !payment) {
+    return res.status(404).json({ success: false, message: "Payment not found for this booking." });
+  }
+  if (booking.bookingStatus === "Cancelled") {
+    return res.status(409).json({ success: false, message: "Cancelled bookings cannot accept payment updates." });
+  }
+  if (payment.paymentMethod !== "UPI") {
+    return res.status(400).json({ success: false, message: "This booking does not use UPI payment." });
+  }
+  if (!["Pending", "Rejected"].includes(payment.paymentStatus)) {
+    return res.status(409).json({ success: false, message: "UPI transaction details cannot be changed now." });
+  }
+
+  const duplicate = await Payment.findOne({ _id: { $ne: payment._id }, transactionId }).select("_id");
+  if (duplicate) {
+    return res.status(409).json({ success: false, message: "This UPI transaction ID has already been submitted." });
+  }
+
+  payment.amount = booking.totalAmount;
+  payment.transactionId = transactionId;
+  payment.paymentStatus = "Verification Pending";
+  payment.verificationStatus = "Pending";
+  payment.verifiedBy = null;
+  payment.verifiedByModel = "";
+  payment.verifiedType = "";
+  payment.verifiedAt = null;
+  await payment.save();
+  await syncBookingPayment(payment, "Verification Pending");
+
+  res.status(202).json({
     success: true,
-    count: payments.length,
-    data: payments,
+    message: "UPI transaction submitted for admin verification.",
+    data: payment,
   });
 });
 
-// @desc    Get payment details for a booking
-// @route   GET /api/v1/payments/customer/:bookingId
-// @access  Customer
+exports.verifyUpiPayment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!validatePaymentId(id, res)) return;
+
+  const action = String(req.body?.action || "").trim().toLowerCase();
+  const remarks = String(req.body?.remarks || "").trim();
+  if (!["approve", "reject"].includes(action)) {
+    return res.status(400).json({ success: false, message: "Action must be approve or reject." });
+  }
+
+  const payment = await Payment.findById(id);
+  if (!payment) return res.status(404).json({ success: false, message: "Payment not found." });
+  if (payment.paymentMethod !== "UPI") {
+    return res.status(400).json({ success: false, message: "Only UPI payments require manual verification." });
+  }
+  if (payment.paymentStatus !== "Verification Pending" || payment.verificationStatus !== "Pending") {
+    return res.status(409).json({ success: false, message: "This UPI payment is not awaiting verification." });
+  }
+
+  const booking = await refreshPaymentAmount(payment);
+  if (!booking) return res.status(404).json({ success: false, message: "Linked booking not found." });
+
+  const now = new Date();
+  payment.verifiedBy = req.user._id;
+  payment.verifiedByModel = "User";
+  payment.verifiedType = "UPI Manual Verification";
+  payment.verifiedAt = now;
+  payment.remarks = remarks.slice(0, 500);
+
+  if (action === "approve") {
+    payment.paymentStatus = "Paid";
+    payment.verificationStatus = "Approved";
+    payment.paidAt = now;
+  } else {
+    payment.paymentStatus = "Rejected";
+    payment.verificationStatus = "Rejected";
+  }
+
+  await payment.save();
+  await syncBookingPayment(payment, payment.paymentStatus);
+
+  const updatedPayment = await paymentPopulate(Payment.findById(id));
+  res.status(200).json({
+    success: true,
+    message: action === "approve" ? "UPI payment approved." : "UPI payment rejected.",
+    data: updatedPayment,
+  });
+});
+
+exports.refundPayment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  if (!validatePaymentId(id, res)) return;
+
+  const payment = await Payment.findById(id);
+  if (!payment) return res.status(404).json({ success: false, message: "Payment not found." });
+  if (payment.paymentStatus !== "Paid") {
+    return res.status(409).json({ success: false, message: "Only paid payments can be marked refunded." });
+  }
+
+  payment.paymentStatus = "Refunded";
+  payment.refundedAt = new Date();
+  payment.remarks = String(req.body?.remarks || payment.remarks || "").trim().slice(0, 500);
+  await payment.save();
+  await syncBookingPayment(payment, "Refunded");
+
+  const updatedPayment = await paymentPopulate(Payment.findById(id));
+  res.status(200).json({ success: true, message: "Payment marked as refunded.", data: updatedPayment });
+});
+
+exports.getCustomerPayments = asyncHandler(async (req, res) => {
+  const payments = await paymentPopulate(Payment.find({ customerId: req.user._id })).sort({ createdAt: -1 });
+  res.status(200).json({ success: true, count: payments.length, data: payments });
+});
+
 exports.getPaymentByBooking = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
-
   if (!mongoose.Types.ObjectId.isValid(bookingId)) {
     return res.status(400).json({
       success: false,
@@ -220,236 +331,105 @@ exports.getPaymentByBooking = asyncHandler(async (req, res) => {
     });
   }
 
-  const payment = await Payment.findOne({
-    bookingId,
-    customerId: req.user._id,
-  })
-    .populate("bookingId")
-    .populate("driverId", "driverName phoneNumber")
-    .populate("verifiedBy", "driverName");
+  const payment = await paymentPopulate(Payment.findOne({ bookingId, customerId: req.user._id }));
+  if (!payment) return res.status(404).json({ success: false, message: "Payment not found for this booking." });
 
-  if (!payment) {
-    return res.status(404).json({
-      success: false,
-      message: "Payment not found for this booking.",
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    data: payment,
-  });
+  res.status(200).json({ success: true, data: payment });
 });
 
-// ===============================
-// Admin Payment APIs
-// ===============================
-
-// @desc    Get all payments
-// @route   GET /api/v1/payments/admin
-// @access  Admin
 exports.getAllPayments = asyncHandler(async (req, res) => {
-  const payments = await Payment.find()
-    .populate("bookingId")
-    .populate("customerId", "name email phone")
-    .populate("driverId", "driverName phoneNumber")
-    .populate("verifiedBy", "driverName")
-    .sort({ createdAt: -1 });
-
-  res.status(200).json({
-    success: true,
-    count: payments.length,
-    data: payments,
-  });
+  const payments = await paymentPopulate(Payment.find()).sort({ createdAt: -1 });
+  res.status(200).json({ success: true, count: payments.length, data: payments });
 });
 
-// @desc    Get payment details by ID
-// @route   GET /api/v1/payments/admin/:id
-// @access  Admin
 exports.getPaymentDetails = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  if (!validatePaymentId(id, res)) return;
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid payment id.",
-      errors: [{ field: "id", message: "Invalid ObjectId" }],
-    });
-  }
+  const payment = await paymentPopulate(Payment.findById(id));
+  if (!payment) return res.status(404).json({ success: false, message: "Payment not found." });
 
-  const payment = await Payment.findById(id)
-    .populate("bookingId")
-    .populate("customerId", "name email phone")
-    .populate("driverId", "driverName phoneNumber")
-    .populate("verifiedBy", "driverName");
-
-  if (!payment) {
-    return res.status(404).json({
-      success: false,
-      message: "Payment not found.",
-    });
-  }
-
-  res.status(200).json({
-    success: true,
-    data: payment,
-  });
+  res.status(200).json({ success: true, data: payment });
 });
 
-// @desc    Get payment statistics
-// @route   GET /api/v1/payments/admin/stats
-// @access  Admin
 exports.getPaymentStats = asyncHandler(async (req, res) => {
   const stats = await Payment.aggregate([
     {
       $group: {
         _id: null,
         totalPayments: { $sum: 1 },
-        pendingPayments: {
-          $sum: { $cond: [{ $eq: ["$paymentStatus", "Pending"] }, 1, 0] },
-        },
-        paidPayments: {
-          $sum: { $cond: [{ $eq: ["$paymentStatus", "Paid"] }, 1, 0] },
-        },
-        failedPayments: {
-          $sum: { $cond: [{ $eq: ["$paymentStatus", "Failed"] }, 1, 0] },
-        },
-        refundedPayments: {
-          $sum: { $cond: [{ $eq: ["$paymentStatus", "Refunded"] }, 1, 0] },
-        },
-        cashPayments: {
-          $sum: { $cond: [{ $eq: ["$paymentMethod", "Cash"] }, 1, 0] },
-        },
-        onlinePayments: {
-          $sum: { $cond: [{ $eq: ["$paymentMethod", "Online"] }, 1, 0] },
-        },
+        pendingPayments: { $sum: { $cond: [{ $eq: ["$paymentStatus", "Pending"] }, 1, 0] } },
+        verificationPendingPayments: { $sum: { $cond: [{ $eq: ["$paymentStatus", "Verification Pending"] }, 1, 0] } },
+        paidPayments: { $sum: { $cond: [{ $eq: ["$paymentStatus", "Paid"] }, 1, 0] } },
+        rejectedPayments: { $sum: { $cond: [{ $eq: ["$paymentStatus", "Rejected"] }, 1, 0] } },
+        refundedPayments: { $sum: { $cond: [{ $eq: ["$paymentStatus", "Refunded"] }, 1, 0] } },
+        cashPayments: { $sum: { $cond: [{ $eq: ["$paymentMethod", "Cash"] }, 1, 0] } },
+        upiPayments: { $sum: { $cond: [{ $eq: ["$paymentMethod", "UPI"] }, 1, 0] } },
       },
     },
   ]);
 
-  const result = stats.length > 0 ? stats[0] : {};
-
+  const result = stats[0] || {};
   res.status(200).json({
     success: true,
     data: {
       totalPayments: result.totalPayments || 0,
       pendingPayments: result.pendingPayments || 0,
+      verificationPendingPayments: result.verificationPendingPayments || 0,
       paidPayments: result.paidPayments || 0,
-      failedPayments: result.failedPayments || 0,
+      rejectedPayments: result.rejectedPayments || 0,
       refundedPayments: result.refundedPayments || 0,
       cashPayments: result.cashPayments || 0,
-      onlinePayments: result.onlinePayments || 0,
+      upiPayments: result.upiPayments || 0,
     },
   });
 });
 
-// @desc    Get revenue report
-// @route   GET /api/v1/payments/admin/revenue
-// @access  Admin
 exports.getRevenueReport = asyncHandler(async (req, res) => {
   const now = new Date();
-  const startOfToday = new Date(now.setHours(0, 0, 0, 0));
-  const endOfToday = new Date(now.setHours(23, 59, 59, 999));
-
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date(now);
+  endOfToday.setHours(23, 59, 59, 999);
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-  const [todayRevenueResult, monthlyRevenueResult, paymentBreakdown] =
-    await Promise.all([
-      // Today's revenue
-      Payment.aggregate([
-        {
-          $match: {
-            paymentStatus: "Paid",
-            verifiedAt: { $gte: startOfToday, $lte: endOfToday },
+  const [todayRevenueResult, monthlyRevenueResult, paymentBreakdown] = await Promise.all([
+    Payment.aggregate([
+      { $match: { paymentStatus: "Paid", paidAt: { $gte: startOfToday, $lte: endOfToday } } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+    Payment.aggregate([
+      { $match: { paymentStatus: "Paid", paidAt: { $gte: startOfMonth, $lte: endOfMonth } } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]),
+    Payment.aggregate([
+      {
+        $group: {
+          _id: null,
+          cashRevenue: {
+            $sum: { $cond: [{ $and: [{ $eq: ["$paymentMethod", "Cash"] }, { $eq: ["$paymentStatus", "Paid"] }] }, "$amount", 0] },
+          },
+          upiRevenue: {
+            $sum: { $cond: [{ $and: [{ $eq: ["$paymentMethod", "UPI"] }, { $eq: ["$paymentStatus", "Paid"] }] }, "$amount", 0] },
+          },
+          totalRevenue: { $sum: { $cond: [{ $eq: ["$paymentStatus", "Paid"] }, "$amount", 0] } },
+          pendingAmount: {
+            $sum: { $cond: [{ $in: ["$paymentStatus", ["Pending", "Verification Pending"]] }, "$amount", 0] },
           },
         },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: "$amount" },
-          },
-        },
-      ]),
+      },
+    ]),
+  ]);
 
-      // Monthly revenue
-      Payment.aggregate([
-        {
-          $match: {
-            paymentStatus: "Paid",
-            verifiedAt: { $gte: startOfMonth, $lte: endOfMonth },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            total: { $sum: "$amount" },
-          },
-        },
-      ]),
-
-      // Revenue by payment method and pending amount
-      Payment.aggregate([
-        {
-          $group: {
-            _id: null,
-            cashRevenue: {
-              $sum: {
-                $cond: [
-                  {
-                    $and: [
-                      { $eq: ["$paymentMethod", "Cash"] },
-                      { $eq: ["$paymentStatus", "Paid"] },
-                    ],
-                  },
-                  "$amount",
-                  0,
-                ],
-              },
-            },
-            onlineRevenue: {
-              $sum: {
-                $cond: [
-                  {
-                    $and: [
-                      { $eq: ["$paymentMethod", "Online"] },
-                      { $eq: ["$paymentStatus", "Paid"] },
-                    ],
-                  },
-                  "$amount",
-                  0,
-                ],
-              },
-            },
-            totalRevenue: {
-              $sum: {
-                $cond: [{ $eq: ["$paymentStatus", "Paid"] }, "$amount", 0],
-              },
-            },
-            pendingAmount: {
-              $sum: {
-                $cond: [{ $eq: ["$paymentStatus", "Pending"] }, "$amount", 0],
-              },
-            },
-          },
-        },
-      ]),
-    ]);
-
-  const todayRevenue =
-    todayRevenueResult.length > 0 ? todayRevenueResult[0].total : 0;
-  const monthlyRevenue =
-    monthlyRevenueResult.length > 0 ? monthlyRevenueResult[0].total : 0;
-  const breakdown =
-    paymentBreakdown.length > 0 ? paymentBreakdown[0] : {};
-
+  const breakdown = paymentBreakdown[0] || {};
   res.status(200).json({
     success: true,
     data: {
-      todayRevenue,
-      monthlyRevenue,
+      todayRevenue: todayRevenueResult[0]?.total || 0,
+      monthlyRevenue: monthlyRevenueResult[0]?.total || 0,
       cashRevenue: breakdown.cashRevenue || 0,
-      onlineRevenue: breakdown.onlineRevenue || 0,
+      upiRevenue: breakdown.upiRevenue || 0,
       totalRevenue: breakdown.totalRevenue || 0,
       pendingAmount: breakdown.pendingAmount || 0,
     },

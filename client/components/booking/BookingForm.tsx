@@ -47,7 +47,7 @@ type BookingFormValues = {
   estimatedHours?: number;
   estimatedKm?: number;
 
-  paymentMethod: "Cash" | "Online";
+  paymentMethod: "Cash" | "UPI";
 };
 
 type InlineErrors = Partial<Record<keyof BookingFormValues, string>>;
@@ -314,9 +314,7 @@ export default function BookingForm() {
       estimatedKm: derived.estimatedKm,
       bookingDate: values.pickupDate,
       pickupTime: values.pickupTime.trim(),
-      // Backend expects "Cash" | "UPI" | "Card" | "Net Banking".
-      // UI uses "Cash" | "Online".
-      paymentMethod: values.paymentMethod === "Cash" ? "Cash" : "UPI",
+      paymentMethod: values.paymentMethod,
     };
 
     return base;
@@ -401,11 +399,6 @@ export default function BookingForm() {
       return;
     }
 
-    // Backend paymentMethod enum is fixed; map UI option -> backend option.
-    // Online (QR Scanner) is represented as UPI in the existing backend.
-    const backendPaymentMethod: "Cash" | "UPI" | "Card" | "Net Banking" =
-      values.paymentMethod === "Cash" ? "Cash" : "UPI";
-
     const payload = {
       customerName: values.customerName.trim(),
       mobileNumber: values.mobileNumber.trim(),
@@ -418,7 +411,7 @@ export default function BookingForm() {
       pickupTime: values.pickupTime.trim(),
       estimatedHours: derived.estimatedHours,
       estimatedKm: derived.estimatedKm,
-      paymentMethod: backendPaymentMethod,
+      paymentMethod: values.paymentMethod,
       notes: values.specialInstructions.trim() || undefined,
     } as const;
 
@@ -834,16 +827,16 @@ export default function BookingForm() {
                     Payment Method *
                   </label>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {(["Cash", "Online"] as const).map((pm) => (
+                    {(["Cash", "UPI"] as const).map((pm) => (
                       <SelectCard
                         key={pm}
-                        title={pm === "Online" ? "Online (QR Scanner)" : pm}
+                        title={pm === "UPI" ? "UPI QR" : pm}
                         selected={values.paymentMethod === pm}
                         onSelect={() => setField("paymentMethod", pm)}
                         description={
                           pm === "Cash"
-                            ? "Pay at ride end."
-                            : "Scan & pay securely."
+                            ? "Pay the assigned driver after trip completion."
+                            : "Scan the business QR and submit your UTR for admin verification."
                         }
                       />
                     ))}

@@ -12,6 +12,7 @@ import {
 import AuthShell from "./AuthShell";
 import AlertCard, { errorDescriptionFromUnknown } from "./AlertCard";
 import { api } from "@/lib/api";
+import { isSessionRole, persistSession } from "@/lib/session";
 import { useRouter } from "next/navigation";
 
 const registerSchema = z
@@ -93,10 +94,8 @@ export default function CustomerRegisterForm() {
       const maybeUser = res?.data?.user;
       const maybeRole: string | undefined = maybeUser?.role;
 
-      if (maybeToken && maybeUser && maybeRole) {
-        localStorage.setItem("token", maybeToken);
-        localStorage.setItem("user", JSON.stringify(maybeUser));
-        localStorage.setItem("role", maybeRole);
+      if (maybeToken && maybeUser && maybeRole === "customer" && isSessionRole(maybeRole)) {
+        persistSession(maybeToken, { ...maybeUser, role: maybeRole });
         router.replace("/booking");
         return;
       }
@@ -214,4 +213,3 @@ export default function CustomerRegisterForm() {
     </main>
   );
 }
-

@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const Driver = require("../models/Driver");
 const generateToken = require("../utils/generateToken");
 const asyncHandler = require("../utils/asyncHandler");
 
@@ -74,8 +75,23 @@ const loginUser = asyncHandler(async (req, res) => {
       message: "Invalid email or password",
     });
   }
-  if (user.status === "blocked") {
-    return res.status(403).json({ success: false, message: "Your account has been blocked. Please contact support." });
+  if (user.status !== "active") {
+    return res.status(403).json({
+      success: false,
+      message: "Your account is not active. Please contact support.",
+    });
+  }
+
+  // A driver role alone is not sufficient: it must map to a managed driver
+  // profile. This removes the former phone-number based identity binding.
+  if (user.role === "driver") {
+    const driverProfiles = await Driver.find({ user: user._id }).select("_id").limit(2);
+    if (driverProfiles.length !== 1) {
+      return res.status(403).json({
+        success: false,
+        message: "Driver account is not linked to exactly one driver profile.",
+      });
+    }
   }
 
   // Compare password
@@ -118,6 +134,10 @@ const getProfile = asyncHandler(async (req, res) => {
     });
   }
 
+  const driverProfile = user.role === "driver"
+    ? await Driver.findOne({ user: user._id }).select("_id")
+    : null;
+
   return res.status(200).json({
     success: true,
     user: {
@@ -130,6 +150,7 @@ const getProfile = asyncHandler(async (req, res) => {
       status: user.status,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
+      driverId: driverProfile?._id || null,
     },
   });
 });

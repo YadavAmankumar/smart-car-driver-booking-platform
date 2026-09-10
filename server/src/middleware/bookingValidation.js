@@ -106,9 +106,9 @@ const bookingValidation = [
     .withMessage("Payment method is required")
     .isString()
     .withMessage("Payment method must be a string")
-    .isIn(["Cash", "UPI", "Card", "Net Banking"])
+    .isIn(["Cash", "UPI"])
     .withMessage(
-      "Payment method must be one of: 'Cash', 'UPI', 'Card', 'Net Banking'"
+      "Payment method must be one of: 'Cash', 'UPI'"
     ),
 
   body("notes")
@@ -147,4 +147,3 @@ const bookingValidation = [
 ];
 
 module.exports = bookingValidation;
-

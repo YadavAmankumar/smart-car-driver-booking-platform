@@ -1,5 +1,6 @@
 const express = require("express");
 const authMiddleware = require("../middleware/auth/authMiddleware");
+const authorizeRoles = require("../middleware/auth/authorizeRoles");
 
 const {
   addCar,
@@ -12,19 +13,18 @@ const {
 const router = express.Router();
 
 // Create Car
-router.post("/", authMiddleware, addCar);
+router.post("/", authMiddleware, authorizeRoles("admin"), addCar);
 
 // Get All Cars
-router.get("/", authMiddleware, getAllCars);
+router.get("/", authMiddleware, authorizeRoles("admin"), getAllCars);
 
 // Get Car By ID
-router.get("/:id", authMiddleware, getCarById);
+router.get("/:id", authMiddleware, authorizeRoles("admin"), getCarById);
 
 // Update Car
-router.put("/:id", authMiddleware, updateCar);
+router.put("/:id", authMiddleware, authorizeRoles("admin"), updateCar);
 
 // Delete Car
-router.delete("/:id", authMiddleware, deleteCar);
+router.delete("/:id", authMiddleware, authorizeRoles("admin"), deleteCar);
 
 module.exports = router;
-

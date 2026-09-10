@@ -6,7 +6,11 @@ const authorizeRoles = require("../../middleware/auth/authorizeRoles");
 const {
   getDriverPayments,
   markCashCollected,
-  approveOnlinePayment,
+  confirmDriverOnlinePayment,
+  submitUpiUtr,
+  verifyUpiPayment,
+  refundPayment,
+  getPaymentConfig,
   getCustomerPayments,
   getPaymentByBooking,
   getAllPayments,
@@ -16,6 +20,13 @@ const {
 } = require("../../controllers/payment/paymentController");
 
 const router = express.Router();
+
+router.get(
+  "/config",
+  authMiddleware,
+  authorizeRoles("customer", "admin"),
+  getPaymentConfig
+);
 
 // ===============================
 // Driver routes
@@ -35,15 +46,22 @@ router.put(
 );
 
 router.put(
-  "/:id/approve",
+  "/:id/online-confirmed",
   authMiddleware,
   authorizeRoles("driver"),
-  approveOnlinePayment
+  confirmDriverOnlinePayment
 );
 
 // ===============================
 // Customer routes
 // ===============================
+router.post(
+  "/customer/:bookingId/upi-utr",
+  authMiddleware,
+  authorizeRoles("customer"),
+  submitUpiUtr
+);
+
 router.get(
   "/customer",
   authMiddleware,
@@ -61,6 +79,20 @@ router.get(
 // ===============================
 // Admin routes
 // ===============================
+router.post(
+  "/admin/:id/verify-upi",
+  authMiddleware,
+  authorizeRoles("admin"),
+  verifyUpiPayment
+);
+
+router.post(
+  "/admin/:id/refund",
+  authMiddleware,
+  authorizeRoles("admin"),
+  refundPayment
+);
+
 router.get(
   "/admin",
   authMiddleware,
@@ -89,6 +121,4 @@ router.get(
   getPaymentDetails
 );
 
-
 module.exports = router;
-

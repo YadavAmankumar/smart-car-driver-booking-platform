@@ -1,4 +1,5 @@
 import axios, { type AxiosError } from "axios";
+import { clearSession, getSessionToken } from "@/lib/session";
 
 export type BookingPayload = {
   customerName: string;
@@ -12,7 +13,7 @@ export type BookingPayload = {
   pickupTime: string;
   estimatedHours?: number;
   estimatedKm?: number;
-  paymentMethod: "Cash" | "UPI" | "Card" | "Net Banking";
+  paymentMethod: "Cash" | "UPI";
   notes?: string;
   // Frontend form includes additional fields like passengers;
   // backend currently does not validate/persist them.
@@ -64,10 +65,24 @@ export const api = axios.create({
   withCredentials: false,
 });
 
+api.interceptors.request.use((config) => {
+  const token = getSessionToken();
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response?.status === 401) clearSession();
+    return Promise.reject(error);
+  },
+);
+
 function getAuthToken(): string | null {
-  if (typeof window === "undefined") return null;
-  // Must match the key used in your login implementation.
-  return localStorage.getItem("token");
+  return getSessionToken();
 }
 
 export type EstimatePricingPayload = {
@@ -79,7 +94,7 @@ export type EstimatePricingPayload = {
   estimatedKm?: number;
   bookingDate: string;
   pickupTime: string;
-  paymentMethod: "Cash" | "UPI" | "Card" | "Net Banking";
+  paymentMethod: "Cash" | "UPI";
 };
 
 export type FareBreakdown = {
@@ -295,7 +310,7 @@ export type PatchAdminBookingStatusResponse = {
 
 export async function patchAdminBookingStatus(
   bookingId: string,
-  bookingStatus: "Pending" | "Confirmed" | "Completed" | "Cancelled",
+  bookingStatus: "Pending" | "Confirmed" | "Ongoing" | "Completed" | "Cancelled",
 ) {
   const token = getAuthToken();
 
@@ -385,15 +400,206 @@ export type CancelBookingResponse = {
   message?: string;
 };
 
-export async function cancelBooking(bookingId: string) {
-  void bookingId;
+export type PaymentRecord = {
+  _id?: string;
+  bookingId?: unknown;
+  customerId?: unknown;
+  driverId?: unknown;
+  amount?: number;
+  paymentMethod?: "Cash" | "UPI" | string;
+  paymentStatus?: string;
+  bookingStatus?: string;
+  transactionId?: string;
+  verificationStatus?: string;
+  remarks?: string;
+  verifiedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
 
-  // Backend currently only supports DELETE /api/bookings/:id (admin route).
+export type PaymentConfig = {
+  upiId: string;
+  upiQrImageUrl: string;
+  payeeName: string;
+};
 
-  // Do not call it from customer UI.
-  throw new Error(
-    "Cancel booking is not supported for customer in backend APIs (DELETE is admin-protected)."
+export async function getPaymentConfig() {
+  const token = getAuthToken();
+  const res = await api.get<{ success: boolean; data: PaymentConfig }>(
+    "/payments/config",
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
   );
+  return res.data;
+}
+
+export async function getPaymentByBooking(bookingId: string) {
+  const token = getAuthToken();
+  const res = await api.get<{ success: boolean; data: PaymentRecord }>(
+    `/payments/customer/${bookingId}`,
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export async function submitUpiUtr(bookingId: string, transactionId: string) {
+  const token = getAuthToken();
+  const res = await api.post<{ success: boolean; message?: string; data: PaymentRecord }>(
+    `/payments/customer/${bookingId}/upi-utr`,
+    { transactionId },
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export async function getAdminPayments() {
+  const token = getAuthToken();
+  const res = await api.get<{ success: boolean; count?: number; data: PaymentRecord[] }>(
+    "/payments/admin",
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export async function verifyAdminUpiPayment(paymentId: string, action: "approve" | "reject", remarks?: string) {
+  const token = getAuthToken();
+  const res = await api.post<{ success: boolean; message?: string; data: PaymentRecord }>(
+    `/payments/admin/${paymentId}/verify-upi`,
+    { action, remarks },
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export type DriverProfile = {
+  id?: string;
+  driverName?: string;
+  phoneNumber?: string;
+  experience?: number;
+  status?: "Available" | "Busy" | string;
+  accountProvisioned?: boolean;
+};
+
+export type DriverBooking = Booking & {
+  totalAmount?: number;
+  estimatedFare?: number;
+  paymentStatus?: string;
+  startedAt?: string;
+  completedAt?: string;
+  customer?: { name?: string; phone?: string };
+  driver?: unknown;
+  car?: { carName?: string; carNumber?: string; carType?: string; isAC?: boolean } | null;
+  payment?: PaymentRecord | null;
+};
+
+export type DriverDashboardData = {
+  driver: DriverProfile;
+  summary: {
+    assignedCount: number;
+    todayCount: number;
+    upcomingCount: number;
+    completedCount: number;
+    paidEarnings: number;
+    pendingAmount: number;
+  };
+  assignedBookings: DriverBooking[];
+  todayTrips: DriverBooking[];
+  upcomingTrips: DriverBooking[];
+  completedTrips: DriverBooking[];
+  payments: PaymentRecord[];
+};
+
+export async function getDriverDashboard() {
+  const token = getAuthToken();
+  const res = await api.get<{ success: boolean; data: DriverDashboardData }>(
+    "/drivers/me/dashboard",
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export async function getDriverBookings() {
+  const token = getAuthToken();
+  const res = await api.get<{ success: boolean; count?: number; data: DriverBooking[] }>(
+    "/drivers/me/bookings",
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export async function updateDriverAvailability(status: "Available" | "Busy") {
+  const token = getAuthToken();
+  const res = await api.put<{ success: boolean; message?: string; data: DriverProfile }>(
+    "/drivers/me/availability",
+    { status },
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export async function updateDriverProfile(payload: Pick<DriverProfile, "driverName" | "phoneNumber" | "experience">) {
+  const token = getAuthToken();
+  const res = await api.put<{ success: boolean; message?: string; data: DriverProfile }>(
+    "/drivers/me",
+    payload,
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export async function startDriverBooking(bookingId: string) {
+  const token = getAuthToken();
+  const res = await api.post<{ success: boolean; message?: string; data: DriverBooking }>(
+    `/drivers/me/bookings/${bookingId}/start`,
+    {},
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export async function completeDriverBooking(bookingId: string) {
+  const token = getAuthToken();
+  const res = await api.post<{ success: boolean; message?: string; data: DriverBooking }>(
+    `/drivers/me/bookings/${bookingId}/complete`,
+    {},
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export async function confirmDriverCashCollection(paymentId: string) {
+  const token = getAuthToken();
+  const res = await api.put<{ success: boolean; message?: string; data: PaymentRecord }>(
+    `/payments/${paymentId}/cash-collected`,
+    {},
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
+export async function confirmDriverOnlinePayment(paymentId: string) {
+  const token = getAuthToken();
+
+  const res = await api.put<{ success: boolean; message?: string; data: PaymentRecord }>(
+    `/payments/${paymentId}/online-confirmed`,
+    {},
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  );
+
+  return res.data;
+}
+
+export async function cancelBooking(bookingId: string) {
+  const token = getAuthToken();
+  const res = await api.post<CancelBookingResponse>(
+    `/bookings/${bookingId}/cancel`,
+    {},
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  );
+  return res.data;
 }
 
 export type GetProfileResponse = {

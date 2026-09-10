@@ -31,12 +31,12 @@ const paymentSchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       required: [true, "Payment method is required"],
-      enum: ["Cash", "Online"],
+      enum: ["Cash", "UPI"],
     },
 
     paymentStatus: {
       type: String,
-      enum: ["Pending", "Paid", "Failed", "Refunded"],
+      enum: ["Pending", "Verification Pending", "Paid", "Rejected", "Cancelled", "Refunded"],
       default: "Pending",
     },
 
@@ -46,15 +46,29 @@ const paymentSchema = new mongoose.Schema(
       default: "",
     },
 
+    verificationStatus: {
+      type: String,
+      enum: ["Not Required", "Pending", "Approved", "Rejected"],
+      default: "Not Required",
+    },
+    paidAt: { type: Date, default: null },
+    refundedAt: { type: Date, default: null },
+
     verifiedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Driver",
+      refPath: "verifiedByModel",
       default: null,
+    },
+
+    verifiedByModel: {
+      type: String,
+      enum: ["Driver", "User", ""],
+      default: "",
     },
 
     verifiedType: {
       type: String,
-      enum: ["Cash Collection", "Online Verification", ""],
+      enum: ["Cash Collection", "UPI Manual Verification", ""],
       default: "",
     },
 
@@ -73,6 +87,12 @@ const paymentSchema = new mongoose.Schema(
   {
     timestamps: true,
   }
+);
+
+paymentSchema.index({ bookingId: 1 }, { unique: true });
+paymentSchema.index(
+  { transactionId: 1 },
+  { unique: true, sparse: true, partialFilterExpression: { transactionId: { $type: "string", $gt: "" } } }
 );
 
 module.exports = mongoose.model("Payment", paymentSchema);

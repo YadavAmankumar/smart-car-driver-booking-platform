@@ -25,9 +25,7 @@ router.put(
   updatePricing
 );
 
-// Public to authenticated customers (not admin)
-router.post("/estimate", authMiddleware, estimateFare);
+router.post("/estimate", authMiddleware, authorizeRoles("customer"), estimateFare);
 
 module.exports = router;
-
 

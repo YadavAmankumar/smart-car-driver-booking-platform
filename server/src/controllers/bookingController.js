@@ -1,7 +1,55 @@
 const Booking = require("../models/Booking");
 const Payment = require("../models/Payment");
+const Driver = require("../models/Driver");
 const asyncHandler = require("../utils/asyncHandler");
 const pricingService = require("../services/pricingService");
+const mongoose = require("mongoose");
+const {
+  BookingLifecycleError,
+  assertBookingResourcesAvailable,
+  refreshResourceAvailability,
+  releaseResourceIfFree,
+  transitionBooking,
+} = require("../services/bookingLifecycleService");
+
+const bookingPopulate = (query) => query
+  .populate({ path: "driver", select: "driverName experience phoneNumber" })
+  .populate({ path: "car", select: "carName carNumber" });
+
+const canAccessBooking = async (user, booking) => {
+  if (user.role === "admin") return true;
+  if (user.role === "customer") {
+    return booking.customer?.equals(user._id) || false;
+  }
+  if (user.role === "driver") {
+    const driver = await Driver.findOne({ user: user._id }).select("_id");
+    return Boolean(driver && booking.driver?.equals(driver._id));
+  }
+  return false;
+};
+
+const sendBookingNotFound = (res) => res.status(404).json({
+  success: false,
+  message: "Booking not found.",
+});
+
+const sendLifecycleError = (res, error) => res.status(error.statusCode || 409).json({
+  success: false,
+  message: error.message,
+});
+
+// Admins may only change operational, non-financial booking details here.
+// Assignment, payment, customer ownership, and fare snapshots stay immutable
+// outside their dedicated workflows.
+const ADMIN_MUTABLE_BOOKING_FIELDS = new Set([
+  "customerName",
+  "mobileNumber",
+  "pickupLocation",
+  "dropLocation",
+  "bookingDate",
+  "pickupTime",
+  "notes",
+]);
 
 // @desc    Create a new booking
 // @route   POST /api/bookings
@@ -43,10 +91,11 @@ exports.createBooking = asyncHandler(async (req, res) => {
   try {
     await session.withTransaction(async () => {
       [booking] = await Booking.create([{
-        customerName, mobileNumber, customer: req.user?._id || null,
+        customerName, mobileNumber, customer: req.user._id,
         serviceType, carType, pickupLocation, dropLocation, bookingDate,
         pickupTime, estimatedHours, estimatedKm, paymentMethod, notes,
         pricingSnapshot: fareResult.pricingSnapshot,
+        statusHistory: [{ to: "Pending", changedBy: req.user._id, reason: "Booking created" }],
         baseFare: fareResult.baseFare, ratePerKm: fareResult.ratePerKm,
         hourlyRate: fareResult.hourlyRate, gst: fareResult.gst,
         airportCharge: fareResult.airportCharge, waitingCharge: fareResult.waitingCharge,
@@ -57,13 +106,11 @@ exports.createBooking = asyncHandler(async (req, res) => {
         totalAmount: fareResult.estimatedFare,
       }], { session });
 
-      // Booking retains the customer's selected method; Payment tracks its
-      // settlement channel, where UPI/Card/Net Banking are all online.
-      const paymentMethodForSettlement = paymentMethod === "Cash" ? "Cash" : "Online";
       const [payment] = await Payment.create([{
-        bookingId: booking._id, customerId: req.user?._id || null,
+        bookingId: booking._id, customerId: req.user._id,
         driverId: booking.driver || null, amount: booking.totalAmount,
-        paymentMethod: paymentMethodForSettlement, paymentStatus: "Pending",
+        paymentMethod, paymentStatus: "Pending",
+        verificationStatus: paymentMethod === "UPI" ? "Pending" : "Not Required",
       }], { session });
 
       booking.payment = payment._id;
@@ -107,21 +154,16 @@ exports.getAllBookings = asyncHandler(async (req, res) => {
 // @route   GET /api/bookings/:id
 // @access  Public
 exports.getBookingById = asyncHandler(async (req, res) => {
-  const booking = await Booking.findById(req.params.id)
-    .populate({
-      path: "driver",
-      select: "driverName experience phoneNumber",
-    })
-    .populate({
-      path: "car",
-      select: "carName carNumber",
-    });
+  const booking = await bookingPopulate(Booking.findById(req.params.id));
 
   if (!booking) {
-    return res.status(404).json({
-      success: false,
-      message: "Booking not found.",
-    });
+    return sendBookingNotFound(res);
+  }
+
+  if (!(await canAccessBooking(req.user, booking))) {
+    // Use the same response as a missing record so booking identifiers do not
+    // reveal whether another customer's booking exists.
+    return sendBookingNotFound(res);
   }
 
   res.status(200).json({
@@ -137,20 +179,40 @@ exports.updateBooking = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id);
 
   if (!booking) {
-    return res.status(404).json({
+    return sendBookingNotFound(res);
+  }
+
+  const requestedFields = Object.keys(req.body || {});
+  const invalidFields = requestedFields.filter(
+    (field) => !ADMIN_MUTABLE_BOOKING_FIELDS.has(field)
+  );
+
+  if (invalidFields.length > 0) {
+    return res.status(400).json({
       success: false,
-      message: "Booking not found.",
+      message: "One or more booking fields cannot be updated through this endpoint.",
+      errors: invalidFields.map((field) => ({ field, message: "Field is protected." })),
     });
   }
 
-  const updatedBooking = await Booking.findByIdAndUpdate(
-    req.params.id,
-    req.body,
-    {
-      new: true,
-      runValidators: true,
+  if (requestedFields.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "At least one mutable booking field is required.",
+    });
+  }
+
+  for (const field of requestedFields) booking[field] = req.body[field];
+  const scheduleChanged = requestedFields.some((field) => ["bookingDate", "pickupTime"].includes(field));
+  if (scheduleChanged && (booking.driver || booking.car)) {
+    try {
+      await assertBookingResourcesAvailable(booking);
+    } catch (error) {
+      if (error instanceof BookingLifecycleError) return sendLifecycleError(res, error);
+      throw error;
     }
-  );
+  }
+  const updatedBooking = await booking.save();
 
   res.status(200).json({
     success: true,
@@ -166,10 +228,7 @@ exports.deleteBooking = asyncHandler(async (req, res) => {
   const booking = await Booking.findById(req.params.id);
 
   if (!booking) {
-    return res.status(404).json({
-      success: false,
-      message: "Booking not found.",
-    });
+    return sendBookingNotFound(res);
   }
 
   await booking.deleteOne();
@@ -184,7 +243,15 @@ exports.deleteBooking = asyncHandler(async (req, res) => {
 // @route   PUT /api/bookings/:id/assign
 // @access  Admin
 exports.assignBooking = asyncHandler(async (req, res) => {
-  const { driverId, carId } = req.body;
+  const payload = req.body || {};
+  const allowedFields = ["driverId", "carId"];
+  const invalidFields = Object.keys(payload).filter((field) => !allowedFields.includes(field));
+  if (invalidFields.length > 0 || Object.keys(payload).length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Provide only driverId and/or carId for assignment.",
+    });
+  }
 
   const booking = await Booking.findById(req.params.id);
 
@@ -195,20 +262,49 @@ exports.assignBooking = asyncHandler(async (req, res) => {
     });
   }
 
-  if (driverId) {
-    booking.driver = driverId;
+  if (!["Pending", "Confirmed"].includes(booking.bookingStatus)) {
+    return res.status(409).json({
+      success: false,
+      message: "Assignments can only be changed while a booking is Pending or Confirmed.",
+    });
   }
 
-  if (carId) {
-    booking.car = carId;
+  const hasDriverChange = Object.prototype.hasOwnProperty.call(payload, "driverId");
+  const hasCarChange = Object.prototype.hasOwnProperty.call(payload, "carId");
+  const oldDriverId = booking.driver;
+  const oldCarId = booking.car;
+
+  for (const [field, value] of [["driver", payload.driverId], ["car", payload.carId]]) {
+    const supplied = field === "driver" ? hasDriverChange : hasCarChange;
+    if (!supplied) continue;
+    if (value !== null && !mongoose.Types.ObjectId.isValid(value)) {
+      return res.status(400).json({ success: false, message: `Invalid ${field} id.` });
+    }
+    if (value === null && booking.bookingStatus !== "Pending") {
+      return res.status(409).json({
+        success: false,
+        message: "Assigned resources can only be unassigned while a booking is Pending.",
+      });
+    }
+    booking[field] = value;
   }
 
-  // Auto-confirm if still pending
-  if (booking.bookingStatus === "Pending") {
-    booking.bookingStatus = "Confirmed";
+  try {
+    await assertBookingResourcesAvailable(booking);
+    if (booking.bookingStatus === "Pending" && booking.driver &&
+      (booking.serviceType === "Driver Only" || booking.car)) {
+      transitionBooking(booking, "Confirmed", req.user._id, "Required resources assigned");
+    }
+  } catch (error) {
+    if (error instanceof BookingLifecycleError) return sendLifecycleError(res, error);
+    throw error;
   }
 
   await booking.save();
+
+  await releaseResourceIfFree("driver", oldDriverId);
+  await releaseResourceIfFree("car", oldCarId);
+  await refreshResourceAvailability(booking);
 
   // Sync assigned driver to the linked payment (do not create new payment)
   // Payment is created/linked at booking creation time via booking.payment
@@ -233,6 +329,35 @@ exports.assignBooking = asyncHandler(async (req, res) => {
     success: true,
     message: "Driver and/or car assigned successfully.",
     data: populatedBooking,
+  });
+});
+
+// @desc    Cancel a customer's own pending or confirmed booking
+// @route   POST /api/v1/bookings/:id/cancel
+// @access  Customer
+exports.cancelCustomerBooking = asyncHandler(async (req, res) => {
+  const booking = await Booking.findOne({ _id: req.params.id, customer: req.user._id });
+  if (!booking) return sendBookingNotFound(res);
+
+  const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "Cancelled by customer";
+  if (reason.length > 500) {
+    return res.status(400).json({ success: false, message: "Cancellation reason cannot exceed 500 characters." });
+  }
+
+  try {
+    transitionBooking(booking, "Cancelled", req.user._id, reason || "Cancelled by customer");
+  } catch (error) {
+    if (error instanceof BookingLifecycleError) return sendLifecycleError(res, error);
+    throw error;
+  }
+
+  await booking.save();
+  await refreshResourceAvailability(booking);
+
+  res.status(200).json({
+    success: true,
+    message: "Booking cancelled successfully.",
+    data: booking,
   });
 });
 
@@ -265,6 +390,27 @@ exports.getCustomerBookings = asyncHandler(async (req, res) => {
       path: "car",
       select: "carName carNumber",
     });
+
+  return res.status(200).json({
+    success: true,
+    count: bookings.length,
+    data: bookings,
+  });
+});
+
+// Driver "GET /api/v1/bookings/driver"
+exports.getDriverBookings = asyncHandler(async (req, res) => {
+  const driver = await Driver.findOne({ user: req.user._id }).select("_id");
+  if (!driver) {
+    return res.status(403).json({
+      success: false,
+      message: "Driver account is not linked to a driver profile.",
+    });
+  }
+
+  const bookings = await bookingPopulate(
+    Booking.find({ driver: driver._id }).sort({ createdAt: -1 })
+  );
 
   return res.status(200).json({
     success: true,
