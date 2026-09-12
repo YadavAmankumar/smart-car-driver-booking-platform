@@ -2,6 +2,14 @@ const mongoose = require("mongoose");
 
 const bookingSchema = new mongoose.Schema(
   {
+    bookingNumber: {
+      type: String,
+      unique: true,
+      sparse: true,
+      trim: true,
+      index: true,
+    },
+
     customerName: {
       type: String,
       required: [true, "Customer name is required"],

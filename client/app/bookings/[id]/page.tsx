@@ -19,6 +19,7 @@ import {
 
 type BookingDetail = {
   _id?: string;
+  bookingNumber?: string;
   customerName?: string;
   mobileNumber?: string;
   email?: string;
@@ -33,10 +34,23 @@ type BookingDetail = {
   paymentStatus?: string;
   totalAmount?: number;
   createdAt?: string;
-  driver?: { name?: string; _id?: string } | string;
-  car?: { name?: string; _id?: string; carType?: string } | string;
-};
 
+  driver?: {
+    driverName?: string;
+    name?: string;
+    phoneNumber?: string;
+    experience?: number;
+    _id?: string;
+  } | string;
+
+  car?: {
+    carName?: string;
+    name?: string;
+    carNumber?: string;
+    carType?: string;
+    _id?: string;
+  } | string;
+};
 function formatDate(d?: string) {
   if (!d) return "";
   const dt = new Date(d);
@@ -213,31 +227,69 @@ export default function BookingDetailsPage() {
 
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                 <Card>
-                  <CardContent className="p-6">
-                    <p className="text-sm font-bold text-slate-900">Driver Information</p>
-                    <p className="mt-2 text-sm text-slate-700">
-                      {typeof booking.driver === "string"
-                        ? booking.driver || "Not assigned yet"
-                        : booking.driver?.name || booking.driver?._id || "Not assigned yet"}
-                    </p>
-                  </CardContent>
-                </Card>
+  <CardContent className="p-6">
+    <p className="text-sm font-bold text-slate-900">👨‍✈️ Your Driver</p>
+
+    {typeof booking.driver === "object" && booking.driver ? (
+      <>
+        <p className="mt-2 text-base font-semibold text-slate-900">
+          {booking.driver.driverName || booking.driver.name || "Driver assigned"}
+        </p>
+
+        {booking.driver.phoneNumber ? (
+          <>
+            <p className="mt-1 text-sm text-slate-700">
+              {booking.driver.phoneNumber}
+            </p>
+
+            <a
+              href={`tel:${booking.driver.phoneNumber}`}
+              className="mt-4 inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              📞 Contact Driver
+            </a>
+          </>
+        ) : null}
+      </>
+    ) : (
+      <p className="mt-2 text-sm text-slate-600">
+        Not assigned yet
+      </p>
+    )}
+  </CardContent>
+</Card>
 
                 <Card>
-                  <CardContent className="p-6">
-                    <p className="text-sm font-bold text-slate-900">Car Information</p>
-                    <p className="mt-2 text-sm text-slate-700">
-                      {typeof booking.car === "string"
-                        ? booking.car || booking.carType || "Not assigned yet"
-                        : booking.car?.name || booking.car?._id || booking.carType || "Not assigned yet"}
-                    </p>
-                    {booking.carType ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <Badge tone="neutral">{booking.carType}</Badge>
-                      </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
+  <CardContent className="p-6">
+    <p className="text-sm font-bold text-slate-900">🚗 Your Vehicle</p>
+
+    {typeof booking.car === "object" && booking.car ? (
+      <>
+        <p className="mt-2 text-base font-semibold text-slate-900">
+          {booking.car.carName || booking.car.name || "Vehicle assigned"}
+        </p>
+
+        {booking.car.carNumber ? (
+          <p className="mt-1 text-sm font-semibold text-slate-700">
+            {booking.car.carNumber}
+          </p>
+        ) : null}
+
+        {(booking.car.carType || booking.carType) ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Badge tone="neutral">
+              {booking.car.carType || booking.carType}
+            </Badge>
+          </div>
+        ) : null}
+      </>
+    ) : (
+      <p className="mt-2 text-sm text-slate-600">
+        Not assigned yet
+      </p>
+    )}
+  </CardContent>
+</Card>
               </div>
 
               <Card>

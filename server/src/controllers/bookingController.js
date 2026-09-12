@@ -1,4 +1,6 @@
 const Booking = require("../models/Booking");
+const BookingCounter = require("../models/BookingCounter");
+const User = require("../models/User");
 const Payment = require("../models/Payment");
 const Driver = require("../models/Driver");
 const asyncHandler = require("../utils/asyncHandler");
@@ -90,7 +92,67 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
   try {
     await session.withTransaction(async () => {
+      const customerUser = await User.findById(req.user._id)
+        .select("phone")
+        .session(session);
+
+      if (!customerUser?.phone) {
+        throw new Error("Registered customer phone number not found.");
+      }
+
+      const registeredPhone = String(customerUser.phone).replace(/\D/g, "");
+
+      if (registeredPhone.length < 3) {
+        throw new Error("Registered customer phone number is invalid.");
+      }
+
+      const customerSuffix = registeredPhone.slice(-3);
+
+      const bookingCreationDate = new Date();
+      const indiaDateParts = new Intl.DateTimeFormat("en-IN", {
+        timeZone: "Asia/Kolkata",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }).formatToParts(bookingCreationDate);
+
+      const dateParts = Object.fromEntries(
+        indiaDateParts.map(({ type, value }) => [type, value])
+      );
+
+      const day = dateParts.day;
+      const monthNumber = dateParts.month;
+      const year = dateParts.year;
+
+      const monthNames = [
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+        "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+      ];
+
+      const month = monthNames[Number(monthNumber) - 1];
+      const dateKey = `${year}${monthNumber}${day}`;
+
+      const counter = await BookingCounter.findOneAndUpdate(
+        {
+          customerSuffix,
+          dateKey,
+        },
+        {
+          $inc: { sequence: 1 },
+        },
+        {
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true,
+          session,
+        }
+      );
+
+      const sequence = String(counter.sequence).padStart(3, "0");
+      const bookingNumber = `SCB-CUS${customerSuffix}-${day}${month}${year}-${sequence}`;
+
       [booking] = await Booking.create([{
+        bookingNumber,
         customerName, mobileNumber, customer: req.user._id,
         serviceType, carType, pickupLocation, dropLocation, bookingDate,
         pickupTime, estimatedHours, estimatedKm, paymentMethod, notes,
