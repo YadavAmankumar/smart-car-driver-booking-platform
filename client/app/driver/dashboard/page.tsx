@@ -186,6 +186,22 @@ export default function DriverDashboardPage() {
     }
   };
 
+  const confirmOnlinePayment = async (paymentId: string) => {
+    try {
+      setBusy(`upi:${paymentId}`);
+
+      await confirmDriverOnlinePayment(paymentId);
+
+      toast.success("Online payment confirmed");
+
+      await refresh();
+    } catch (e) {
+      toast.error(getAxiosErrorMessage(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {loading ? (
@@ -346,6 +362,27 @@ export default function DriverDashboardPage() {
                   data.assignedBookings.map((booking) => {
                     const id = booking._id ?? "";
 
+                    const bookingPayment = data.payments.find(
+                      (payment) => bookingIdFromPayment(payment) === id,
+                    );
+
+                    const paymentId = bookingPayment?._id;
+
+                    const isCashPending =
+                      bookingPayment?.paymentMethod === "Cash" &&
+                      bookingPayment?.paymentStatus === "Pending" &&
+                      Boolean(paymentId);
+
+                    const isUpiPending =
+                      bookingPayment?.paymentMethod === "UPI" &&
+                      ["Pending", "Verification Pending"].includes(
+                        bookingPayment?.paymentStatus ?? "",
+                      ) &&
+                      Boolean(paymentId);
+
+                    const isPaymentPaid =
+                      bookingPayment?.paymentStatus === "Paid";
+
                     return (
                       <div
                         key={id}
@@ -393,24 +430,51 @@ export default function DriverDashboardPage() {
                                   void runBookingAction(id, "start")
                                 }
                               >
-                                Start
+                                {busy === `start:${id}`
+                                  ? "Starting..."
+                                  : "Start Trip"}
                               </Button>
                             ) : null}
 
-                            {booking.bookingStatus === "Ongoing" ? (
+                            {booking.bookingStatus === "Ongoing" &&
+                            isCashPending &&
+                            paymentId ? (
                               <Button
                                 size="sm"
                                 type="button"
-                                disabled={busy === `complete:${id}`}
+                                disabled={busy === `cash:${paymentId}`}
                                 onClick={() =>
-                                  void runBookingAction(
-                                    id,
-                                    "complete",
-                                  )
+                                  void collectCash(paymentId)
                                 }
                               >
-                                Complete
+                                {busy === `cash:${paymentId}`
+                                  ? "Confirming..."
+                                  : "Cash Collected & Complete Trip"}
                               </Button>
+                            ) : null}
+
+                            {booking.bookingStatus === "Ongoing" &&
+                            isUpiPending &&
+                            paymentId ? (
+                              <Button
+                                size="sm"
+                                type="button"
+                                disabled={busy === `upi:${paymentId}`}
+                                onClick={() =>
+                                  void confirmOnlinePayment(paymentId)
+                                }
+                              >
+                                {busy === `upi:${paymentId}`
+                                  ? "Confirming..."
+                                  : "Confirm UPI & Complete Trip"}
+                              </Button>
+                            ) : null}
+
+                            {booking.bookingStatus === "Completed" &&
+                            isPaymentPaid ? (
+                              <span className="text-sm font-semibold text-emerald-600">
+                                Payment Paid • Trip Completed
+                              </span>
                             ) : null}
                           </div>
                         </div>
