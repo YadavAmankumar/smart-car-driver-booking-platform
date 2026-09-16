@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
@@ -25,70 +25,6 @@ import {
   type DriverBooking,
   type DriverDashboardData,
 } from "@/lib/api";
-import { clearSession } from "@/lib/session";
-
-const navItems = [
-  "Dashboard",
-  "My Profile",
-  "My Bookings",
-  "Assigned Car",
-  "Trip Details",
-  "Payment/Cash Collection",
-  "Earnings/History",
-];
-
-function DriverShell({
-  children,
-  onLogout,
-  driverName,
-}: {
-  children: ReactNode;
-  onLogout: () => void;
-  driverName?: string;
-}) {
-  return (
-    <main className="min-h-[70vh] bg-slate-50">
-      <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 md:px-6">
-        <aside className="hidden w-64 shrink-0 border-r border-slate-200 bg-white px-4 py-5 md:block">
-          <div className="mb-6">
-            <p className="text-sm font-bold text-slate-900">
-              {driverName || "Driver"}
-            </p>
-            <p className="text-xs text-slate-500">Workspace</p>
-          </div>
-
-          <nav
-            className="flex flex-col gap-1"
-            aria-label="Driver dashboard"
-          >
-            {navItems.map((item) => (
-              <a
-                key={item}
-                href={`#${item
-                  .toLowerCase()
-                  .replaceAll("/", "-")
-                  .replaceAll(" ", "-")}`}
-                className="rounded-md px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                {item}
-              </a>
-            ))}
-
-            <button
-              type="button"
-              onClick={onLogout}
-              className="mt-4 rounded-md px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50"
-            >
-              Logout
-            </button>
-          </nav>
-        </aside>
-
-        <section className="min-w-0 flex-1">{children}</section>
-      </div>
-    </main>
-  );
-}
 
 function formatMoney(value?: number) {
   return `₹${Number(value || 0).toLocaleString("en-IN")}`;
@@ -156,11 +92,6 @@ export default function DriverDashboardPage() {
       ) ?? data?.upcomingTrips?.[0],
     [data],
   );
-
-  const logout = () => {
-    clearSession();
-    router.replace("/");
-  };
 
   const runBookingAction = async (
     id: string,
@@ -256,10 +187,7 @@ export default function DriverDashboardPage() {
   };
 
   return (
-    <DriverShell
-      onLogout={logout}
-      driverName={data?.driver?.driverName}
-    >
+    <div className="space-y-6">
       {loading ? (
         <Card>
           <CardContent className="flex items-center gap-3 text-slate-600">
@@ -268,7 +196,7 @@ export default function DriverDashboardPage() {
           </CardContent>
         </Card>
       ) : data ? (
-        <div className="space-y-6">
+        <>
           <section
             id="dashboard"
             className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
@@ -631,8 +559,8 @@ export default function DriverDashboardPage() {
     </CardContent>
   </Card>
 </section>
-        </div>
+        </>
       ) : null}
-    </DriverShell>
+    </div>
   );
 }
