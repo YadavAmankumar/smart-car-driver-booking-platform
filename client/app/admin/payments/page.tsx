@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { Badge, Button, Card, CardContent, Input } from "@/components/ui/primitives";
-import { getAdminPayments, verifyAdminUpiPayment, type PaymentRecord } from "@/lib/api";
+import { Badge, Card, CardContent } from "@/components/ui/primitives";
+import { getAdminPayments, type PaymentRecord } from "@/lib/api";
 
 function money(amount?: number) {
   return new Intl.NumberFormat(undefined, {
@@ -29,8 +29,6 @@ function bookingLabel(payment: PaymentRecord) {
 export default function AdminPaymentsPage() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [remarks, setRemarks] = useState<Record<string, string>>({});
-  const [workingId, setWorkingId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -53,26 +51,12 @@ export default function AdminPaymentsPage() {
     [payments],
   );
 
-  async function verify(paymentId: string | undefined, action: "approve" | "reject") {
-    if (!paymentId || workingId) return;
-    setWorkingId(paymentId);
-    try {
-      const res = await verifyAdminUpiPayment(paymentId, action, remarks[paymentId]);
-      setPayments((current) => current.map((payment) => payment._id === paymentId ? res.data : payment));
-      toast.success(action === "approve" ? "UPI payment approved." : "UPI payment rejected.");
-    } catch {
-      toast.error("Unable to update UPI payment.");
-    } finally {
-      setWorkingId(null);
-    }
-  }
-
   return (
     <section className="space-y-6">
       <div>
         <h1 className="text-2xl font-extrabold text-slate-900">Payments</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Review cash collections and manually verify UPI transaction IDs.
+          Monitor payment records and driver-confirmed payment status.
         </p>
       </div>
 
@@ -114,14 +98,10 @@ export default function AdminPaymentsPage() {
                     <th className="px-4 py-3">Method</th>
                     <th className="px-4 py-3">Amount</th>
                     <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">UTR</th>
-                    <th className="px-4 py-3">Admin Remarks</th>
-                    <th className="px-4 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payments.map((payment) => {
-                    const canVerify = payment.paymentMethod === "UPI" && payment.paymentStatus === "Verification Pending";
                     return (
                       <tr key={payment._id} className="border-t border-slate-100">
                         <td className="px-4 py-3 font-semibold text-slate-900">{bookingLabel(payment)}</td>
@@ -129,36 +109,6 @@ export default function AdminPaymentsPage() {
                         <td className="px-4 py-3 text-slate-700">{money(payment.amount)}</td>
                         <td className="px-4 py-3">
                           <Badge tone={statusTone(payment.paymentStatus)}>{payment.paymentStatus || "Pending"}</Badge>
-                        </td>
-                        <td className="px-4 py-3 font-mono text-xs text-slate-700">{payment.transactionId || "-"}</td>
-                        <td className="px-4 py-3">
-                          <Input
-                            value={remarks[payment._id || ""] ?? ""}
-                            onChange={(event) => setRemarks((current) => ({ ...current, [payment._id || ""]: event.target.value }))}
-                            placeholder="Optional note"
-                            disabled={!canVerify}
-                          />
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex gap-2">
-                            <Button
-                              type="button"
-                              size="sm"
-                              disabled={!canVerify || workingId === payment._id}
-                              onClick={() => void verify(payment._id, "approve")}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="danger"
-                              disabled={!canVerify || workingId === payment._id}
-                              onClick={() => void verify(payment._id, "reject")}
-                            >
-                              Reject
-                            </Button>
-                          </div>
                         </td>
                       </tr>
                     );

@@ -4,11 +4,27 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
 
-import { getCustomerProfile } from "@/lib/api";
+import {
+  getAdminBookings,
+  getAdminDashboardStats,
+  getCustomerProfile,
+  type AdminDashboardStats,
+} from "@/lib/api";
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<AdminDashboardStats | null>(null);
+  const [recentBookings, setRecentBookings] = useState<
+    Array<{
+      _id?: string;
+      customerName?: string;
+      serviceType?: string;
+      carType?: string;
+      bookingDate?: string;
+      bookingStatus?: string;
+    }>
+  >([]);
 
   useEffect(() => {
     let mounted = true;
@@ -17,6 +33,18 @@ export default function AdminDashboardPage() {
       try {
         const res = await getCustomerProfile();
         const role = res?.user?.role;
+
+        if (role === "admin") {
+          const [dashboardRes, bookingsRes] = await Promise.all([
+            getAdminDashboardStats(),
+            getAdminBookings(),
+          ]);
+
+          if (!mounted) return;
+
+          setStats(dashboardRes.data);
+          setRecentBookings(bookingsRes.data.slice(0, 4));
+        }
 
         if (!mounted) return;
 
@@ -52,12 +80,12 @@ export default function AdminDashboardPage() {
           {/* KPI Cards */}
           <section>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-              <StatCard title="Total Bookings" value="—" hint="All time" />
-              <StatCard title="Active Trips" value="—" hint="In progress" />
-              <StatCard title="Revenue" value="—" hint="This month" />
-              <StatCard title="Drivers" value="—" hint="Available" />
-              <StatCard title="Fleet" value="—" hint="Vehicles" />
-              <StatCard title="Pending Payments" value="—" hint="Awaiting" accent />
+              <StatCard title="Total Bookings" value={stats ? String(stats.totalBookings) : "—"} hint="All time" />
+              <StatCard title="Active Trips" value={stats ? String(stats.ongoingBookings) : "—"} hint="In progress" />
+              <StatCard title="Revenue" value={stats ? `₹${stats.totalRevenue.toLocaleString("en-IN")}` : "—"} hint="Collected" />
+              <StatCard title="Drivers" value={stats ? String(stats.availableDrivers) : "—"} hint="Available" />
+              <StatCard title="Fleet" value={stats ? String(stats.totalCars) : "—"} hint="Vehicles" />
+              <StatCard title="Pending Payments" value={stats ? String(stats.pendingPayments) : "—"} hint="Awaiting" accent />
             </div>
           </section>
 
@@ -85,10 +113,38 @@ export default function AdminDashboardPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 text-sm">
-                        <PlaceholderRow />
-                        <PlaceholderRow />
-                        <PlaceholderRow />
-                        <PlaceholderRow />
+                        {recentBookings.length > 0 ? (
+                          recentBookings.map((booking) => (
+                            <tr key={booking._id} className="text-slate-700">
+                              <td className="px-4 py-3 font-semibold text-slate-900">
+                                {booking._id ? `#${booking._id.slice(-6).toUpperCase()}` : "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                {booking.customerName || "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                {booking.carType || booking.serviceType || "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                {booking.bookingDate
+                                  ? new Date(booking.bookingDate).toLocaleDateString("en-IN")
+                                  : "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <BookingStatusBadge status={booking.bookingStatus} />
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td
+                              colSpan={5}
+                              className="px-4 py-8 text-center text-sm text-slate-500"
+                            >
+                              No bookings found.
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -104,9 +160,21 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  <StatusRow label="Available" value="—" tone="green" />
-                  <StatusRow label="On Trip" value="—" tone="blue" />
-                  <StatusRow label="Offline" value="—" tone="slate" />
+                  <StatusRow
+                    label="Available"
+                    value={stats ? String(stats.availableDrivers) : "—"}
+                    tone="green"
+                  />
+                  <StatusRow
+                    label="On Trip"
+                    value={stats ? String(stats.onTripDrivers) : "—"}
+                    tone="blue"
+                  />
+                  <StatusRow
+                    label="Offline"
+                    value={stats ? String(stats.offlineDriversCount) : "—"}
+                    tone="slate"
+                  />
                 </div>
 
                 <div className="mt-5 rounded-xl bg-slate-50 p-4 ring-1 ring-slate-200">
@@ -129,18 +197,41 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  <StatusRow label="Ready" value="—" tone="green" />
-                  <StatusRow label="In Service" value="—" tone="amber" />
-                  <StatusRow label="Maintenance" value="—" tone="red" />
+                  <StatusRow
+                    label="Ready"
+                    value={stats ? String(stats.readyCars) : "—"}
+                    tone="green"
+                  />
+                  <StatusRow
+                    label="In Service"
+                    value={stats ? String(stats.inServiceCars) : "—"}
+                    tone="amber"
+                  />
+                  <StatusRow
+                    label="Maintenance"
+                    value="—"
+                    tone="red"
+                  />
                 </div>
 
                 <div className="mt-5">
                   <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                    <div className="h-full w-[62%] rounded-full bg-slate-900" />
+                    <div
+                      className="h-full rounded-full bg-slate-900"
+                      style={{
+                        width: `${stats && stats.totalCars > 0
+                          ? Math.round((stats.inServiceCars / stats.totalCars) * 100)
+                          : 0}%`,
+                      }}
+                    />
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
                     <span>Utilization</span>
-                    <span className="font-semibold text-slate-800">62%</span>
+                    <span className="font-semibold text-slate-800">
+                      {stats && stats.totalCars > 0
+                        ? `${Math.round((stats.inServiceCars / stats.totalCars) * 100)}%`
+                        : "—"}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -154,10 +245,21 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <ActionButton title="Create Booking" subtitle="Add new trip" />
-                <ActionButton title="Pricing" subtitle="Manage fare rates" />
-                  <ActionButton title="Driver Dispatch" subtitle="Assign available drivers" />
-                  <ActionButton title="View Payments" subtitle="Review pending invoices" />
+                  <ActionButton
+                    title="Pricing"
+                    subtitle="Manage fare rates"
+                    onClick={() => router.push("/admin/pricing")}
+                  />
+                  <ActionButton
+                    title="Driver Dispatch"
+                    subtitle="Assign available drivers"
+                    onClick={() => router.push("/admin/drivers")}
+                  />
+                  <ActionButton
+                    title="View Payments"
+                    subtitle="Review pending invoices"
+                    onClick={() => router.push("/admin/payments")}
+                  />
                 </div>
 
                 <div className="mt-5 rounded-xl bg-slate-900 p-4 text-white">
@@ -248,6 +350,25 @@ function StatCard({
   );
 }
 
+function BookingStatusBadge({ status }: { status?: string }) {
+  const styles: Record<string, string> = {
+    Pending: "bg-amber-50 text-amber-700",
+    Confirmed: "bg-blue-50 text-blue-700",
+    Ongoing: "bg-indigo-50 text-indigo-700",
+    Completed: "bg-green-50 text-green-700",
+    Cancelled: "bg-red-50 text-red-700",
+  };
+
+  const label = status || "Unknown";
+  const className = styles[label] || "bg-slate-100 text-slate-600";
+
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>
+      {label}
+    </span>
+  );
+}
+
 function PlaceholderRow() {
   return (
     <tr className="hover:bg-slate-50">
@@ -302,17 +423,17 @@ function StatusRow({
 function ActionButton({
   title,
   subtitle,
+  onClick,
 }: {
   title: string;
   subtitle: string;
+  onClick?: () => void;
 }) {
   return (
     <button
       type="button"
       className="group rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-slate-300 hover:shadow-md"
-      onClick={() => {
-        // No routing/business logic changes. Intentionally a visual-only button.
-      }}
+      onClick={onClick}
     >
       <div className="flex items-start justify-between gap-3">
         <div>

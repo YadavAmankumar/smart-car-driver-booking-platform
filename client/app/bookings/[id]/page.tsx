@@ -12,7 +12,6 @@ import {
   getBookingById,
   getPaymentByBooking,
   getPaymentConfig,
-  markUpiPaid,
   type PaymentConfig,
   type PaymentRecord,
 } from "@/lib/api";
@@ -68,7 +67,6 @@ export default function BookingDetailsPage() {
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
-  const [markingUpiPaid, setMarkingUpiPaid] = useState(false);
 
   const canCancel = booking?.bookingStatus === "Pending" || booking?.bookingStatus === "Confirmed";
 
@@ -88,25 +86,7 @@ export default function BookingDetailsPage() {
     }
   }
 
-  async function handleMarkUpiPaid() {
-    if (!booking?._id || markingUpiPaid) return;
 
-    setMarkingUpiPaid(true);
-    try {
-      const res = await markUpiPaid(booking._id);
-      setPayment(res.data);
-      setBooking((current) =>
-        current
-          ? { ...current, paymentStatus: res.data.paymentStatus }
-          : current,
-      );
-      toast.success("UPI payment marked for driver confirmation.");
-    } catch {
-      toast.error("Unable to confirm UPI payment.");
-    } finally {
-      setMarkingUpiPaid(false);
-    }
-  }
 
   useEffect(() => {
     let mounted = true;
@@ -396,38 +376,14 @@ export default function BookingDetailsPage() {
                         </p>
                       ) : null}
 
-                      <p className="text-sm font-semibold text-slate-900">
-                        Amount: ₹{Number(booking.totalAmount || payment?.amount || 0).toFixed(2)}
-                      </p>
-
-                      {payment?.paymentStatus === "Verification Pending" ? (
-                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                          Payment marked as paid. Waiting for the assigned driver to confirm the UPI payment.
-                        </div>
-                      ) : payment?.paymentStatus === "Paid" ? (
+                      {payment?.paymentStatus === "Paid" ? (
                         <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
                           UPI payment confirmed and marked as Paid.
                         </div>
                       ) : (
-                        <>
-                          <p className="text-xs text-slate-600">
-                            Scan the QR code using any UPI app, complete the payment, then click “I Have Paid”.
-                          </p>
-
-                          <Button
-                            type="button"
-                            className="w-full rounded-lg"
-                            onClick={handleMarkUpiPaid}
-                            disabled={
-                              markingUpiPaid ||
-                              booking.bookingStatus === "Cancelled" ||
-                              !paymentConfig?.upiId ||
-                              payment?.paymentStatus !== "Pending"
-                            }
-                          >
-                            {markingUpiPaid ? "Confirming..." : "I Have Paid"}
-                          </Button>
-                        </>
+                        <p className="text-xs text-slate-600">
+                          Scan the QR code using any UPI app, complete the payment, then inform the assigned driver that you have paid.
+                        </p>
                       )}
                     </div>
                   ) : (

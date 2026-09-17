@@ -4,6 +4,7 @@ const Booking = require("../models/Booking");
 const Driver = require("../models/Driver");
 const Car = require("../models/Car");
 const User = require("../models/User");
+const Payment = require("../models/Payment");
 
 const asyncHandler = require("../utils/asyncHandler");
 const {
@@ -87,44 +88,97 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
     totalBookings,
     pendingBookings,
     confirmedBookings,
+    ongoingBookings,
     completedBookings,
     cancelledBookings,
     totalDrivers,
     availableDrivers,
     totalCars,
     availableCars,
+    ongoingCarIds,
     todayBookings,
     totalRevenueResult,
+    pendingPayments,
+    ongoingDriverIds,
   ] = await Promise.all([
     Booking.countDocuments(),
     Booking.countDocuments({ bookingStatus: "Pending" }),
     Booking.countDocuments({ bookingStatus: "Confirmed" }),
+    Booking.countDocuments({ bookingStatus: "Ongoing" }),
     Booking.countDocuments({ bookingStatus: "Completed" }),
     Booking.countDocuments({ bookingStatus: "Cancelled" }),
     Driver.countDocuments(),
     Driver.countDocuments({ status: "Available" }),
     Car.countDocuments(),
     Car.countDocuments({ isAvailable: true }),
+    Booking.distinct("car", {
+      bookingStatus: "Ongoing",
+      car: { $ne: null },
+    }),
     Booking.countDocuments({
       createdAt: {
         $gte: new Date(new Date().setHours(0, 0, 0, 0)),
         $lt: new Date(new Date().setHours(23, 59, 59, 999)),
       },
     }),
-    Booking.aggregate([
+    Payment.aggregate([
+      {
+        $match: {
+          paymentStatus: "Paid",
+        },
+      },
       {
         $group: {
           _id: null,
-          totalRevenue: { $sum: "$totalAmount" },
+          totalRevenue: { $sum: "$amount" },
         },
       },
     ]),
+    Payment.countDocuments({
+      paymentStatus: {
+        $in: ["Pending", "Verification Pending"],
+      },
+    }),
+    Booking.distinct("driver", {
+      bookingStatus: "Ongoing",
+      driver: { $ne: null },
+    }),
   ]);
 
   const totalRevenue =
-    totalRevenueResult && totalRevenueResult.length > 0
+    totalRevenueResult.length > 0
       ? totalRevenueResult[0].totalRevenue
       : 0;
+
+  const ongoingCarIdSet = new Set(
+    ongoingCarIds
+      .filter(Boolean)
+      .map((carId) => String(carId))
+  );
+
+  const inServiceCars = ongoingCarIdSet.size;
+
+  const readyCars = Math.max(
+    availableCars - inServiceCars,
+    0
+  );
+
+  const ongoingDriverIdSet = new Set(
+    ongoingDriverIds
+      .filter(Boolean)
+      .map((driverId) => String(driverId))
+  );
+
+  const onTripDrivers = ongoingDriverIdSet.size;
+
+  const activeDriverCount = await Driver.countDocuments({
+    isDeleted: false,
+  });
+
+  const offlineDriversCount = Math.max(
+    activeDriverCount - availableDrivers - onTripDrivers,
+    0
+  );
 
   res.status(200).json({
     success: true,
@@ -132,14 +186,20 @@ exports.getDashboardStats = asyncHandler(async (req, res) => {
       totalBookings,
       pendingBookings,
       confirmedBookings,
+      ongoingBookings,
       completedBookings,
       cancelledBookings,
       totalDrivers,
       availableDrivers,
+      onTripDrivers,
+      offlineDriversCount,
       totalCars,
       availableCars,
+      readyCars,
+      inServiceCars,
       todayBookings,
       totalRevenue,
+      pendingPayments,
     },
   });
 });

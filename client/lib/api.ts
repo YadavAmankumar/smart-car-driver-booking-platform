@@ -281,7 +281,7 @@ export async function getAllBookings() {
 export type AdminGetBookingsResponse = GetBookingsResponse;
 
 export async function getAdminBookings(params?: {
-  status?: "Pending" | "Confirmed" | "Completed" | "Cancelled";
+  status?: "Pending" | "Confirmed" | "Ongoing" | "Completed" | "Cancelled";
   search?: string;
 }) {
   const token = getAuthToken();
@@ -441,30 +441,11 @@ export async function getPaymentByBooking(bookingId: string) {
   return res.data;
 }
 
-export async function markUpiPaid(bookingId: string) {
-  const token = getAuthToken();
-  const res = await api.post<{ success: boolean; message?: string; data: PaymentRecord }>(
-    `/payments/customer/${bookingId}/upi-paid`,
-    {},
-    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
-  );
-  return res.data;
-}
 
 export async function getAdminPayments() {
   const token = getAuthToken();
   const res = await api.get<{ success: boolean; count?: number; data: PaymentRecord[] }>(
     "/payments/admin",
-    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
-  );
-  return res.data;
-}
-
-export async function verifyAdminUpiPayment(paymentId: string, action: "approve" | "reject", remarks?: string) {
-  const token = getAuthToken();
-  const res = await api.post<{ success: boolean; message?: string; data: PaymentRecord }>(
-    `/payments/admin/${paymentId}/verify-upi`,
-    { action, remarks },
     { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
   );
   return res.data;
@@ -769,6 +750,43 @@ export async function deleteCar(carId: string) {
   const token = getAuthToken();
 
   const res = await api.delete<DeleteCarResponse>(`/cars/${carId}`, {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
+  });
+
+  return res.data;
+}
+
+export type AdminDashboardStats = {
+  totalBookings: number;
+  pendingBookings: number;
+  confirmedBookings: number;
+  ongoingBookings: number;
+  completedBookings: number;
+  cancelledBookings: number;
+  totalDrivers: number;
+  availableDrivers: number;
+  onTripDrivers: number;
+  offlineDriversCount: number;
+  totalCars: number;
+  availableCars: number;
+  readyCars: number;
+  inServiceCars: number;
+  todayBookings: number;
+  totalRevenue: number;
+  pendingPayments: number;
+};
+
+export async function getAdminDashboardStats() {
+  const token = getAuthToken();
+
+  const res = await api.get<{
+    success: boolean;
+    data: AdminDashboardStats;
+  }>("/admin/dashboard", {
     headers: token
       ? {
           Authorization: `Bearer ${token}`,

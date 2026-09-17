@@ -222,7 +222,7 @@ export default function AdminBookingsPage() {
 
         const data = await getAdminBookings({
           status:
-            statusFilter === "All" || statusFilter === "Ongoing"
+            statusFilter === "All"
               ? undefined
               : statusFilter,
           search,
@@ -274,7 +274,7 @@ export default function AdminBookingsPage() {
 
         const data = await getAdminBookings({
           status:
-            statusFilter === "All" || statusFilter === "Ongoing"
+            statusFilter === "All"
               ? undefined
               : statusFilter,
           search,
@@ -361,7 +361,7 @@ export default function AdminBookingsPage() {
   try {
     const data = await getAdminBookings({
       status:
-        statusFilter === "All" || statusFilter === "Ongoing"
+        statusFilter === "All"
           ? undefined
           : statusFilter,
       search,
@@ -678,20 +678,6 @@ export default function AdminBookingsPage() {
                               }
                             >
                               Confirm Booking
-                            </MenuItem>
-
-                            <MenuItem
-                              disabled={
-                                status !== "Ongoing"
-                              }
-                              onClick={() =>
-                                openStatusDialog(
-                                  b,
-                                  "Completed",
-                                )
-                              }
-                            >
-                              Complete Booking
                             </MenuItem>
 
                             <MenuItem
