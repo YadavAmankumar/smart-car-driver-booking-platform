@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
-  completeDriverBooking,
   getDriverBookings,
   getCustomerProfile,
   startDriverBooking,
@@ -104,23 +103,6 @@ export default function DriverTripsPage() {
 
       if (response.success) {
         toast.success(response.message ?? "Trip started successfully.");
-        await loadTrips();
-      }
-    } catch (error) {
-      toast.error(getAxiosErrorMessage(error));
-    } finally {
-      setBusyId(null);
-    }
-  };
-
-  const handleComplete = async (bookingId: string) => {
-    try {
-      setBusyId(bookingId);
-
-      const response = await completeDriverBooking(bookingId);
-
-      if (response.success) {
-        toast.success(response.message ?? "Trip completed successfully.");
         await loadTrips();
       }
     } catch (error) {
@@ -364,18 +346,6 @@ export default function DriverTripsPage() {
                         disabled={busyId !== null}
                       >
                         {isStarting ? "Starting Trip..." : "Start Trip"}
-                      </Button>
-                    )}
-
-                    {booking.bookingStatus === "Ongoing" && bookingId && (
-                      <Button
-                        type="button"
-                        onClick={() => void handleComplete(bookingId)}
-                        disabled={busyId !== null}
-                      >
-                        {isCompleting
-                          ? "Completing Trip..."
-                          : "Complete Trip"}
                       </Button>
                     )}
 

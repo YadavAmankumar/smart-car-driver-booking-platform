@@ -441,11 +441,11 @@ export async function getPaymentByBooking(bookingId: string) {
   return res.data;
 }
 
-export async function submitUpiUtr(bookingId: string, transactionId: string) {
+export async function markUpiPaid(bookingId: string) {
   const token = getAuthToken();
   const res = await api.post<{ success: boolean; message?: string; data: PaymentRecord }>(
-    `/payments/customer/${bookingId}/upi-utr`,
-    { transactionId },
+    `/payments/customer/${bookingId}/upi-paid`,
+    {},
     { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
   );
   return res.data;
@@ -550,16 +550,6 @@ export async function startDriverBooking(bookingId: string) {
   const token = getAuthToken();
   const res = await api.post<{ success: boolean; message?: string; data: DriverBooking }>(
     `/drivers/me/bookings/${bookingId}/start`,
-    {},
-    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
-  );
-  return res.data;
-}
-
-export async function completeDriverBooking(bookingId: string) {
-  const token = getAuthToken();
-  const res = await api.post<{ success: boolean; message?: string; data: DriverBooking }>(
-    `/drivers/me/bookings/${bookingId}/complete`,
     {},
     { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
   );

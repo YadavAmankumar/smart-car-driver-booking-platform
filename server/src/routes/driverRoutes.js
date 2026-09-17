@@ -16,7 +16,6 @@ const {
   getMyDriverBookings,
   updateMyAvailability,
   startAssignedBooking,
-  completeAssignedBooking,
   updateDriver,
   deleteDriver,
 } = require("../controllers/driverController");
@@ -43,7 +42,6 @@ router.get("/me/dashboard", authMiddleware, authorizeRoles("driver"), getMyDrive
 router.get("/me/bookings", authMiddleware, authorizeRoles("driver"), getMyDriverBookings);
 router.put("/me/availability", authMiddleware, authorizeRoles("driver"), updateMyAvailability);
 router.post("/me/bookings/:id/start", authMiddleware, authorizeRoles("driver"), startAssignedBooking);
-router.post("/me/bookings/:id/complete", authMiddleware, authorizeRoles("driver"), completeAssignedBooking);
 
 // Get Driver By ID
 router.get("/:id", authMiddleware, authorizeRoles("admin"), getDriverById);

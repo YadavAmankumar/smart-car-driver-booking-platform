@@ -15,7 +15,6 @@ import {
 } from "@/components/ui/primitives";
 
 import {
-  completeDriverBooking,
   getAxiosErrorMessage,
   getCustomerProfile,
   getDriverBookings,
@@ -112,20 +111,12 @@ export default function DriverBookingsPage() {
     };
   }, [router]);
 
-  const handleTripAction = async (
-    bookingId: string,
-    action: "start" | "complete",
-  ) => {
+  const handleTripAction = async (bookingId: string) => {
     try {
-      setBusy(`${action}:${bookingId}`);
+      setBusy(`start:${bookingId}`);
 
-      if (action === "start") {
-        await startDriverBooking(bookingId);
-        toast.success("Trip started successfully");
-      } else {
-        await completeDriverBooking(bookingId);
-        toast.success("Trip completed successfully");
-      }
+      await startDriverBooking(bookingId);
+      toast.success("Trip started successfully");
 
       await refresh();
     } catch (e) {
@@ -317,7 +308,6 @@ export default function DriverBookingsPage() {
                             onClick={() =>
                               void handleTripAction(
                                 bookingId,
-                                "start",
                               )
                             }
                           >
@@ -327,22 +317,6 @@ export default function DriverBookingsPage() {
                           </Button>
                         )}
 
-                        {status === "Ongoing" && (
-                          <Button
-                            type="button"
-                            disabled={busy !== null}
-                            onClick={() =>
-                              void handleTripAction(
-                                bookingId,
-                                "complete",
-                              )
-                            }
-                          >
-                            {completeBusy
-                              ? "Completing..."
-                              : "Complete Trip"}
-                          </Button>
-                        )}
                       </div>
                     )}
                 </CardContent>

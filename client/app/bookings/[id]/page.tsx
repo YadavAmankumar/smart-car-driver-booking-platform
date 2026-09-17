@@ -12,7 +12,7 @@ import {
   getBookingById,
   getPaymentByBooking,
   getPaymentConfig,
-  submitUpiUtr,
+  markUpiPaid,
   type PaymentConfig,
   type PaymentRecord,
 } from "@/lib/api";
@@ -66,10 +66,9 @@ export default function BookingDetailsPage() {
   const [booking, setBooking] = useState<BookingDetail | null>(null);
   const [payment, setPayment] = useState<PaymentRecord | null>(null);
   const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
-  const [utr, setUtr] = useState("");
   const [loading, setLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
-  const [submittingUtr, setSubmittingUtr] = useState(false);
+  const [markingUpiPaid, setMarkingUpiPaid] = useState(false);
 
   const canCancel = booking?.bookingStatus === "Pending" || booking?.bookingStatus === "Confirmed";
 
@@ -89,18 +88,23 @@ export default function BookingDetailsPage() {
     }
   }
 
-  async function handleSubmitUtr() {
-    if (!booking?._id || submittingUtr) return;
-    setSubmittingUtr(true);
+  async function handleMarkUpiPaid() {
+    if (!booking?._id || markingUpiPaid) return;
+
+    setMarkingUpiPaid(true);
     try {
-      const res = await submitUpiUtr(booking._id, utr);
+      const res = await markUpiPaid(booking._id);
       setPayment(res.data);
-      setBooking((current) => current ? { ...current, paymentStatus: res.data.paymentStatus } : current);
-      toast.success("UPI transaction submitted for verification.");
+      setBooking((current) =>
+        current
+          ? { ...current, paymentStatus: res.data.paymentStatus }
+          : current,
+      );
+      toast.success("UPI payment marked for driver confirmation.");
     } catch {
-      toast.error("Unable to submit UPI transaction ID.");
+      toast.error("Unable to confirm UPI payment.");
     } finally {
-      setSubmittingUtr(false);
+      setMarkingUpiPaid(false);
     }
   }
 
@@ -366,38 +370,65 @@ export default function BookingDetailsPage() {
                   {booking.paymentMethod && booking.paymentMethod !== "Cash" ? (
                     <div className="mt-4 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-4">
                       <p className="text-sm font-semibold text-slate-900">UPI QR Payment</p>
+
                       {paymentConfig?.upiQrImageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={paymentConfig.upiQrImageUrl} alt="Business UPI QR code" className="mx-auto h-44 w-44 rounded-lg border border-slate-200 bg-white object-contain p-2" />
-                      ) : null}
-                      {paymentConfig?.upiId ? (
-                        <p className="break-all text-xs text-slate-600">UPI ID: {paymentConfig.upiId}</p>
+                        <img
+                          src={paymentConfig.upiQrImageUrl}
+                          alt="Business UPI QR code"
+                          className="mx-auto h-44 w-44 rounded-lg border border-slate-200 bg-white object-contain p-2"
+                        />
                       ) : (
-                        <p className="text-xs text-amber-700">UPI QR configuration is not available yet.</p>
+                        <p className="text-xs text-amber-700">
+                          UPI QR configuration is not available yet.
+                        </p>
                       )}
-                      <p className="text-xs text-slate-600">
-                        Scan with any UPI app, complete payment, then submit the UTR. Admin approval is required before this is marked Paid.
+
+                      {paymentConfig?.upiId ? (
+                        <p className="break-all text-xs text-slate-600">
+                          UPI ID: {paymentConfig.upiId}
+                        </p>
+                      ) : null}
+
+                      {paymentConfig?.payeeName ? (
+                        <p className="text-xs text-slate-600">
+                          Payee: {paymentConfig.payeeName}
+                        </p>
+                      ) : null}
+
+                      <p className="text-sm font-semibold text-slate-900">
+                        Amount: ₹{Number(booking.totalAmount || payment?.amount || 0).toFixed(2)}
                       </p>
-                      <Input
-                        value={utr}
-                        onChange={(event) => setUtr(event.target.value)}
-                        placeholder="Enter UPI transaction ID / UTR"
-                        disabled={!["Pending", "Rejected"].includes(payment?.paymentStatus || "Pending")}
-                      />
-                      <Button
-                        type="button"
-                        className="w-full rounded-lg"
-                        onClick={handleSubmitUtr}
-                        disabled={
-                          submittingUtr ||
-                          booking.bookingStatus === "Cancelled" ||
-                          !paymentConfig?.upiId ||
-                          !/^[A-Za-z0-9/-]{8,35}$/.test(utr.trim()) ||
-                          !["Pending", "Rejected"].includes(payment?.paymentStatus || "Pending")
-                        }
-                      >
-                        {submittingUtr ? "Submitting..." : "Submit UTR for Verification"}
-                      </Button>
+
+                      {payment?.paymentStatus === "Verification Pending" ? (
+                        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                          Payment marked as paid. Waiting for the assigned driver to confirm the UPI payment.
+                        </div>
+                      ) : payment?.paymentStatus === "Paid" ? (
+                        <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                          UPI payment confirmed and marked as Paid.
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xs text-slate-600">
+                            Scan the QR code using any UPI app, complete the payment, then click “I Have Paid”.
+                          </p>
+
+                          <Button
+                            type="button"
+                            className="w-full rounded-lg"
+                            onClick={handleMarkUpiPaid}
+                            disabled={
+                              markingUpiPaid ||
+                              booking.bookingStatus === "Cancelled" ||
+                              !paymentConfig?.upiId ||
+                              payment?.paymentStatus !== "Pending"
+                            }
+                          >
+                            {markingUpiPaid ? "Confirming..." : "I Have Paid"}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">

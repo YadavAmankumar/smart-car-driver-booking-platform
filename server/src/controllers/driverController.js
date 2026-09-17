@@ -554,30 +554,6 @@ exports.startAssignedBooking = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, message: "Trip started.", data: updatedBooking });
 });
 
-exports.completeAssignedBooking = asyncHandler(async (req, res) => {
-  const driver = await getLinkedDriver(req.user._id);
-  if (!driver) return res.status(404).json({ success: false, message: "Driver profile not found." });
-
-  const { booking, error } = await findAssignedBooking(req.params.id, driver._id);
-  if (error) return res.status(error.status).json({ success: false, message: error.message });
-  if (booking.bookingStatus !== "Ongoing") {
-    return res.status(409).json({ success: false, message: "Only ongoing bookings can be completed." });
-  }
-
-  try {
-    transitionBooking(booking, "Completed", req.user._id, "Completed by assigned driver");
-  } catch (err) {
-    if (err instanceof BookingLifecycleError) return sendLifecycleError(res, err);
-    throw err;
-  }
-
-  booking.completedAt = new Date();
-  await booking.save();
-  await refreshResourceAvailability(booking);
-
-  const updatedBooking = await driverBookingPopulate(Booking.findById(booking._id));
-  res.status(200).json({ success: true, message: "Trip completed.", data: updatedBooking });
-});
 
 // @desc    Update driver
 // @route   PUT /api/v1/drivers/:id

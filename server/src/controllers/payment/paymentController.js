@@ -228,18 +228,13 @@ exports.confirmDriverOnlinePayment = asyncHandler(async (req, res) => {
   });
 });
 
-exports.submitUpiUtr = asyncHandler(async (req, res) => {
+exports.customerMarkUpiPaid = asyncHandler(async (req, res) => {
   const { bookingId } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(bookingId)) {
-    return res.status(400).json({ success: false, message: "Invalid booking id." });
-  }
 
-  const transactionId = sanitizeUtr(req.body?.transactionId || req.body?.utr);
-  if (!UTR_PATTERN.test(transactionId)) {
+  if (!mongoose.Types.ObjectId.isValid(bookingId)) {
     return res.status(400).json({
       success: false,
-      message: "Enter a valid UPI transaction ID/UTR.",
-      errors: [{ field: "transactionId", message: "UTR must be 8-35 letters, numbers, slash, or hyphen characters." }],
+      message: "Invalid booking id.",
     });
   }
 
@@ -249,37 +244,49 @@ exports.submitUpiUtr = asyncHandler(async (req, res) => {
   ]);
 
   if (!booking || !payment) {
-    return res.status(404).json({ success: false, message: "Payment not found for this booking." });
-  }
-  if (booking.bookingStatus === "Cancelled") {
-    return res.status(409).json({ success: false, message: "Cancelled bookings cannot accept payment updates." });
-  }
-  if (payment.paymentMethod !== "UPI") {
-    return res.status(400).json({ success: false, message: "This booking does not use UPI payment." });
-  }
-  if (!["Pending", "Rejected"].includes(payment.paymentStatus)) {
-    return res.status(409).json({ success: false, message: "UPI transaction details cannot be changed now." });
+    return res.status(404).json({
+      success: false,
+      message: "Payment not found for this booking.",
+    });
   }
 
-  const duplicate = await Payment.findOne({ _id: { $ne: payment._id }, transactionId }).select("_id");
-  if (duplicate) {
-    return res.status(409).json({ success: false, message: "This UPI transaction ID has already been submitted." });
+  if (booking.bookingStatus === "Cancelled") {
+    return res.status(409).json({
+      success: false,
+      message: "Cancelled bookings cannot accept payment updates.",
+    });
+  }
+
+  if (payment.paymentMethod !== "UPI") {
+    return res.status(400).json({
+      success: false,
+      message: "This booking does not use UPI payment.",
+    });
+  }
+
+  if (payment.paymentStatus !== "Pending") {
+    return res.status(409).json({
+      success: false,
+      message: "This UPI payment cannot be marked as paid now.",
+    });
   }
 
   payment.amount = booking.totalAmount;
-  payment.transactionId = transactionId;
   payment.paymentStatus = "Verification Pending";
   payment.verificationStatus = "Pending";
+  payment.transactionId = "";
   payment.verifiedBy = null;
   payment.verifiedByModel = "";
   payment.verifiedType = "";
   payment.verifiedAt = null;
+  payment.paidAt = null;
+
   await payment.save();
   await syncBookingPayment(payment, "Verification Pending");
 
   res.status(202).json({
     success: true,
-    message: "UPI transaction submitted for admin verification.",
+    message: "UPI payment marked as paid by customer. Driver confirmation is required.",
     data: payment,
   });
 });

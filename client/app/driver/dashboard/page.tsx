@@ -14,7 +14,6 @@ import {
   LoadingSpinner,
 } from "@/components/ui/primitives";
 import {
-  completeDriverBooking,
   confirmDriverCashCollection,
   confirmDriverOnlinePayment,
   getAxiosErrorMessage,
@@ -93,22 +92,13 @@ export default function DriverDashboardPage() {
     [data],
   );
 
-  const runBookingAction = async (
-    id: string,
-    action: "start" | "complete",
-  ) => {
+  const runBookingAction = async (id: string) => {
     try {
-      setBusy(`${action}:${id}`);
+      setBusy(`start:${id}`);
 
-      if (action === "start") {
-        await startDriverBooking(id);
-      } else {
-        await completeDriverBooking(id);
-      }
+      await startDriverBooking(id);
 
-      toast.success(
-        action === "start" ? "Trip started" : "Trip completed",
-      );
+      toast.success("Trip started");
 
       await refresh();
     } catch (e) {
@@ -427,7 +417,7 @@ export default function DriverDashboardPage() {
                                 type="button"
                                 disabled={busy === `start:${id}`}
                                 onClick={() =>
-                                  void runBookingAction(id, "start")
+                                  void runBookingAction(id)
                                 }
                               >
                                 {busy === `start:${id}`
