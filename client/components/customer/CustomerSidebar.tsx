@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 export default function CustomerSidebar({
   onLogout,
@@ -9,6 +10,29 @@ export default function CustomerSidebar({
   onLogout: () => void;
 }) {
   const pathname = usePathname();
+  const [userName, setUserName] = useState("Customer");
+
+  useEffect(() => {
+    const rawUser = localStorage.getItem("user");
+
+    if (!rawUser) return;
+
+    try {
+      const user = JSON.parse(rawUser) as { name?: string };
+      if (user.name?.trim()) {
+        setUserName(user.name.trim());
+      }
+    } catch {
+      // Keep the fallback name if stored user data is invalid.
+    }
+  }, []);
+
+  const initials = userName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "CU";
 
   const items: Array<{ label: string; href?: string; onClick?: () => void }> = [
     { label: "Dashboard", href: "/dashboard/customer" },
@@ -22,12 +46,14 @@ export default function CustomerSidebar({
       <div className="flex h-full flex-col px-5 py-6">
         <div>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-white">
-              SD
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
+              {initials}
             </div>
-            <div>
-              <p className="text-sm font-bold text-slate-900">Customer</p>
-              <p className="text-xs text-slate-500">Dashboard</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-slate-900">
+                {userName}
+              </p>
+              <p className="text-xs text-slate-500">Passenger</p>
             </div>
           </div>
         </div>

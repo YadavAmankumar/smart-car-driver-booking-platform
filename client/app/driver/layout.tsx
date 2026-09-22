@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { clearSession } from "@/lib/session";
 
 const navItems = [
@@ -22,6 +23,30 @@ export default function DriverLayout({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [driverName, setDriverName] = useState("Driver");
+
+  useEffect(() => {
+    const rawUser = localStorage.getItem("user");
+
+    if (!rawUser) return;
+
+    try {
+      const user = JSON.parse(rawUser) as { name?: string };
+      if (user.name?.trim()) {
+        setDriverName(user.name.trim());
+      }
+    } catch {
+      // Keep the fallback name if stored user data is invalid.
+    }
+  }, []);
+
+  const initials =
+    driverName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("") || "DR";
 
   const handleLogout = () => {
     clearSession();
@@ -33,12 +58,17 @@ export default function DriverLayout({
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6 md:px-6">
         <aside className="hidden w-64 shrink-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:block">
           <div className="mb-6 border-b border-slate-100 pb-4">
-            <p className="text-lg font-bold text-slate-900">
-              Driver Panel
-            </p>
-            <p className="text-xs text-slate-500">
-              Driver workspace
-            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
+                {initials}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-bold text-slate-900">
+                  {driverName}
+                </p>
+                <p className="text-xs text-slate-500">Driver</p>
+              </div>
+            </div>
           </div>
 
           <nav

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 function ComingSoonItem({ label }: { label: string }) {
   return (
@@ -14,6 +16,32 @@ function ComingSoonItem({ label }: { label: string }) {
 }
 
 export default function AdminSidebar() {
+  const pathname = usePathname();
+  const [adminName, setAdminName] = useState("Administrator");
+
+  useEffect(() => {
+    const rawUser = localStorage.getItem("user");
+
+    if (!rawUser) return;
+
+    try {
+      const user = JSON.parse(rawUser) as { name?: string };
+      if (user.name?.trim()) {
+        setAdminName(user.name.trim());
+      }
+    } catch {
+      // Keep the fallback name if stored user data is invalid.
+    }
+  }, []);
+
+  const initials =
+    adminName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("") || "AD";
+
   // Backend endpoints exist for Dashboard/Bookings/Cars/Drivers/Pricing/Payments.
   // Customers/Analytics/Settings are currently not wired; keep visible with Coming Soon.
   const items: Array<
@@ -32,16 +60,18 @@ export default function AdminSidebar() {
   ];
 
   return (
-    <aside className="sticky top-20 hidden h-[calc(100vh-5rem)] w-64 shrink-0 border-r border-slate-200 bg-white/70 backdrop-blur md:block">
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-slate-200 bg-white/70 backdrop-blur md:block">
       <div className="flex h-full flex-col px-5 py-6">
         <div>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-white">
-              AD
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">
+              {initials}
             </div>
-            <div>
-              <p className="text-sm font-bold text-slate-900">Admin</p>
-              <p className="text-xs text-slate-500">Navigation</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold text-slate-900">
+                {adminName}
+              </p>
+              <p className="text-xs text-slate-500">Administrator</p>
             </div>
           </div>
         </div>
@@ -52,11 +82,20 @@ export default function AdminSidebar() {
               return <ComingSoonItem key={it.label} label={it.label} />;
             }
 
+            const isActive =
+              pathname === it.href ||
+              (it.href !== "/admin/dashboard" &&
+                pathname.startsWith(`${it.href}/`));
+
             return (
               <Link
                 key={it.label}
                 href={it.href}
-                className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  isActive
+                    ? "bg-slate-900 text-white"
+                    : "text-slate-700 hover:bg-slate-50"
+                }`}
               >
                 {it.label}
               </Link>
