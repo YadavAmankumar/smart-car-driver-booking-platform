@@ -64,16 +64,7 @@ export default function Footer() {
               </div>
             </div>
 
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={redirectToBookingOrLogin}
-                className="inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 md:w-auto"
-              >
-                Book Now
-              </button>
 
-            </div>
           </div>
         </div>
       </div>

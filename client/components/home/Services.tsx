@@ -1,10 +1,11 @@
-import { Headphones, Plane, Route, ShieldCheck, Timer } from "lucide-react";
+import { ArrowRight, Headphones, Route, ShieldCheck, Timer } from "lucide-react";
+
+import { redirectToBookingOrLogin } from "@/lib/bookingAuth";
 
 type Service = {
   title:
     | "Driver Only"
     | "Car + Driver"
-    | "Airport Transfer"
     | "Local Ride"
     | "Outstation";
   description: string;
@@ -14,27 +15,22 @@ type Service = {
 const services: Service[] = [
   {
     title: "Driver Only",
-    description: "Book a trained driver for your car and go hands-on your way.",
+    description: "Book a professional driver for your own car.",
     icon: Timer,
   },
   {
     title: "Car + Driver",
-    description: "A complete package with verified driver and a ready car.",
+    description: "Book a car with a professional driver for your trip.",
     icon: Route,
   },
   {
-    title: "Airport Transfer",
-    description: "Flight-aware pickups and smooth drop-offs to terminals.",
-    icon: Plane,
-  },
-  {
     title: "Local Ride",
-    description: "Quick local trips with transparent coordination.",
+    description: "Convenient local travel within the city.",
     icon: ShieldCheck,
   },
   {
     title: "Outstation",
-    description: "Comfortable long drives with professional chauffeurs.",
+    description: "Comfortable travel for trips outside the city.",
     icon: Headphones,
   },
 ];
@@ -48,18 +44,17 @@ export default function Services() {
           Choose the ride that fits your plans
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-sm leading-relaxed text-slate-600">
-          From driver-only convenience to airport and outstation comfort, pick
-          what you need and book in minutes.
+          Choose a service that fits your trip and book your driver in minutes.
         </p>
       </div>
 
-      <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {services.map((s) => {
           const Icon = s.icon;
           return (
             <article
               key={s.title}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow"
+              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-md"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -71,10 +66,14 @@ export default function Services() {
                 </div>
               </div>
 
-              <div className="mt-5 flex items-center gap-2 text-xs font-semibold text-slate-700">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-                Professional dispatch
-              </div>
+              <button
+                type="button"
+                onClick={redirectToBookingOrLogin}
+                className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 transition-colors hover:text-slate-600"
+              >
+                Book this service
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </button>
             </article>
           );
         })}

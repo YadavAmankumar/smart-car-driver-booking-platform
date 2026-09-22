@@ -104,25 +104,37 @@ function SelectCard({
       aria-pressed={selected}
       className={
         selected
-          ? "rounded-xl border border-[#2563EB] bg-[#EFF6FF] px-4 py-3 text-left shadow-sm outline-none ring-2 ring-[#2563EB]/20"
-          : "rounded-xl border border-[#E2E8F0] bg-white px-4 py-3 text-left shadow-sm transition hover:bg-[#F8FAFC] focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20"
+          ? "rounded-xl border border-slate-950 bg-slate-950 px-4 py-3 text-left shadow-md outline-none ring-2 ring-slate-950/10"
+          : "rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-all duration-200 hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-950/10"
       }
     >
       <div className="flex items-start gap-3">
         <div
           className={
             selected
-              ? "mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#2563EB]/10 text-[#1D4ED8]"
-              : "mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-[#475569]"
+              ? "mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-950"
+              : "mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-500"
           }
           aria-hidden="true"
         >
           {selected ? "✓" : ""}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-[#0F172A]">{title}</p>
+          <p
+            className={`text-sm font-semibold ${
+              selected ? "text-white" : "text-slate-900"
+            }`}
+          >
+            {title}
+          </p>
           {description ? (
-            <p className="mt-1 text-xs text-[#64748B]">{description}</p>
+            <p
+              className={`mt-1 text-xs ${
+                selected ? "text-slate-300" : "text-slate-500"
+              }`}
+            >
+              {description}
+            </p>
           ) : null}
         </div>
       </div>
@@ -593,6 +605,15 @@ export default function BookingForm() {
         <CardContent className="p-0">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_360px]">
             <div className="p-6">
+              <div className="mb-5">
+                <h2 className="text-base font-bold text-slate-900">
+                  Customer Details
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  Enter the details we can use to contact you about this booking.
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-[#0F172A]">
@@ -746,6 +767,17 @@ export default function BookingForm() {
                   ) : null}
                 </div>
 
+                <div className="md:col-span-2 pt-2">
+                  <div className="mb-3">
+                    <h2 className="text-base font-bold text-slate-900">
+                      Vehicle Preference
+                    </h2>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Select your preferred vehicle type for the ride.
+                    </p>
+                  </div>
+                </div>
+
                 <div className="md:col-span-2">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -758,11 +790,11 @@ export default function BookingForm() {
                           : "You can select AC / Non-AC now—this will apply when choosing Car + Driver."}
                       </p>
                     </div>
-                    {values.serviceType === "Car with Driver" ? (
-                      <Badge tone="blue">Preference active</Badge>
-                    ) : (
-                      <Badge tone="neutral">Preference saved</Badge>
-                    )}
+                    <Badge tone="neutral">
+                      {values.serviceType === "Car with Driver"
+                        ? "Preference active"
+                        : "Preference saved"}
+                    </Badge>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <SelectCard
@@ -844,16 +876,23 @@ export default function BookingForm() {
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="mb-1 block text-sm font-medium text-[#0F172A]">
-                    Special Instructions
-                  </label>
+                  <div className="mb-2">
+                    <label className="block text-sm font-semibold text-slate-900">
+                      Additional Instructions
+                    </label>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Add any pickup, travel, or driver-related information.
+                    </p>
+                  </div>
+
                   <Textarea
                     value={values.specialInstructions}
                     onChange={(ev) =>
                       setField("specialInstructions", ev.target.value)
                     }
-                    placeholder="Anything we should know?"
-                    rows={4}
+                    placeholder="Example: Please call me when the driver arrives."
+                    rows={3}
+                    className="resize-none"
                   />
                 </div>
               </div>
@@ -924,7 +963,7 @@ export default function BookingForm() {
                 <Button
                   type="submit"
                   disabled={confirmDisabled}
-                  className="rounded-lg"
+                  className="h-11 min-w-32 rounded-lg bg-slate-950 px-6 font-semibold text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {confirmDisabled ? (
                     <span className="inline-flex items-center gap-2">
@@ -944,38 +983,47 @@ export default function BookingForm() {
                 <h3 className="sr-only">Fare Breakdown</h3>
                 <Card className="overflow-hidden">
                   <CardContent className="p-5">
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
                       <div>
-                        <p className="text-sm font-bold text-[#0F172A]">
+                        <p className="text-base font-bold text-slate-900">
                           Fare Breakdown
                         </p>
-                        <p className="mt-1 text-xs text-[#64748B]">
-                          Estimated fare. Final fare may vary depending on
-                          actual trip conditions.
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          Your estimated trip cost based on the selected service.
                         </p>
                       </div>
                       {estimateLoading ? (
-                        <Badge tone="blue">Estimating</Badge>
+                        <Badge tone="neutral">Calculating</Badge>
                       ) : estimatedTotal != null ? (
-                        <Badge tone="green">Ready</Badge>
+                        <Badge tone="neutral">Estimated</Badge>
                       ) : null}
                     </div>
 
                     {values.serviceType === "Driver Only" ? (
-                      <div className="mt-4 space-y-3 text-sm">
-                        <div className="flex items-start justify-between gap-4">
-                          <span className="text-xs font-semibold text-[#64748B]">
-                            Estimated Cost
-                          </span>
-                          <span className="text-right font-semibold text-[#0F172A]">
+                      <div className="mt-5 rounded-xl bg-slate-50 p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Estimated Cost
+                            </p>
+                            <p className="mt-1 text-xs text-slate-400">
+                              Based on your selected trip details
+                            </p>
+                          </div>
+
+                          <div className="text-right">
                             {estimateLoading ? (
-                              <Skeleton className="h-4 w-24" />
+                              <Skeleton className="h-7 w-24" />
                             ) : estimatedTotal != null ? (
-                              formatMoney(estimatedTotal)
+                              <p className="text-2xl font-bold tracking-tight text-slate-950">
+                                {formatMoney(estimatedTotal)}
+                              </p>
                             ) : (
-                              "-"
+                              <p className="text-2xl font-bold text-slate-400">
+                                —
+                              </p>
                             )}
-                          </span>
+                          </div>
                         </div>
 
                         <div className="flex items-start justify-between gap-4">
