@@ -369,22 +369,6 @@ function BookingStatusBadge({ status }: { status?: string }) {
   );
 }
 
-function PlaceholderRow() {
-  return (
-    <tr className="hover:bg-slate-50">
-      <td className="px-4 py-3 text-sm font-semibold text-slate-800">—</td>
-      <td className="px-4 py-3 text-sm text-slate-600">—</td>
-      <td className="px-4 py-3 text-sm text-slate-600">—</td>
-      <td className="px-4 py-3 text-sm text-slate-600">—</td>
-      <td className="px-4 py-3">
-        <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-          Pending
-        </span>
-      </td>
-    </tr>
-  );
-}
-
 function StatusRow({
   label,
   value,

@@ -20,6 +20,7 @@ export default function CustomerSidebar({
     try {
       const user = JSON.parse(rawUser) as { name?: string };
       if (user.name?.trim()) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setUserName(user.name.trim());
       }
     } catch {

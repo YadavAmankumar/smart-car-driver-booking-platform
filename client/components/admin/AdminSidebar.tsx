@@ -27,6 +27,7 @@ export default function AdminSidebar() {
     try {
       const user = JSON.parse(rawUser) as { name?: string };
       if (user.name?.trim()) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setAdminName(user.name.trim());
       }
     } catch {

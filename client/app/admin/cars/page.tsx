@@ -137,12 +137,7 @@ export default function AdminCarsPage() {
     return () => {
       mounted = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search]);
 
 
   const filteredCars = useMemo(() => {

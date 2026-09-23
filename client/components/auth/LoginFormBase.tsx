@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Eye, EyeOff, Mail } from "lucide-react";
 
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -43,6 +44,7 @@ export default function LoginFormBase({
 
   const [error, setError] = useState<{ title: string; description: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginValues>({
     defaultValues: {
@@ -105,13 +107,25 @@ export default function LoginFormBase({
               noValidate
             >
               <div className="space-y-2">
-                <label className="text-sm font-medium text-[#0F172A]">Email</label>
-                <Input
-                  type="email"
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  {...form.register("email")}
-                />
+                <label className="text-sm font-medium text-slate-900">
+                  Email
+                </label>
+
+                <div className="relative">
+                  <Mail
+                    className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+                    aria-hidden="true"
+                  />
+
+                  <Input
+                    type="email"
+                    placeholder="amankumar@example.com"
+                    autoComplete="email"
+                    className="h-12 min-w-0 rounded-xl pl-10 pr-4 text-sm sm:text-base transition focus:border-slate-950 focus:ring-slate-950"
+                    {...form.register("email")}
+                  />
+                </div>
+
                 {form.formState.errors.email ? (
                   <p className="text-xs text-red-600">
                     {form.formState.errors.email.message}
@@ -120,13 +134,37 @@ export default function LoginFormBase({
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-[#0F172A]">Password</label>
-                <Input
-                  type="password"
-                  placeholder="••••••••"
-                  autoComplete={role === "admin" ? "new-password" : "current-password"}
-                  {...form.register("password")}
-                />
+                <label className="text-sm font-medium text-slate-900">
+                  Password
+                </label>
+
+                <div className="relative">
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    autoComplete={
+                      role === "admin" ? "new-password" : "current-password"
+                    }
+                    className="h-12 rounded-xl px-4 pr-12 transition focus:border-slate-950 focus:ring-slate-950"
+                    {...form.register("password")}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-900"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" aria-hidden="true" />
+                    ) : (
+                      <Eye className="h-5 w-5" aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+
                 {form.formState.errors.password ? (
                   <p className="text-xs text-red-600">
                     {form.formState.errors.password.message}
@@ -162,7 +200,7 @@ export default function LoginFormBase({
 
               <Button
                 type="submit"
-                className="mt-2 w-full rounded-md"
+                className="mt-3 h-12 w-full rounded-xl bg-slate-950 text-white shadow-sm transition hover:bg-slate-800"
                 disabled={loading || form.formState.isSubmitting}
               >
                 {loading ? <LoadingSpinner className="text-white" /> : actionLabel}
@@ -171,7 +209,7 @@ export default function LoginFormBase({
               {registerHref ? (
                 <p className="text-center text-sm text-[#64748B]">
                   Don&apos;t have an account?{" "}
-                  <Link className="font-medium text-[#2563EB] hover:underline" href={registerHref}>
+                  <Link className="font-semibold text-slate-950 transition hover:text-slate-600" href={registerHref}>
                     Register
                   </Link>
                 </p>

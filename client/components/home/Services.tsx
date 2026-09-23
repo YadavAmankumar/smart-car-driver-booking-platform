@@ -1,6 +1,11 @@
+"use client";
+
 import { ArrowRight, Headphones, Route, ShieldCheck, Timer } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { redirectToBookingOrLogin } from "@/lib/bookingAuth";
+
+type Role = "customer" | "driver" | "admin";
 
 type Service = {
   title:
@@ -35,7 +40,28 @@ const services: Service[] = [
   },
 ];
 
+function getStoredRole(): Role | null {
+  if (typeof window === "undefined") return null;
+
+  const rawRole = localStorage.getItem("role");
+
+  if (rawRole === "customer" || rawRole === "driver" || rawRole === "admin") {
+    return rawRole;
+  }
+
+  return null;
+}
+
 export default function Services() {
+  const [authRole, setAuthRole] = useState<Role | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAuthRole(getStoredRole());
+  }, []);
+
+  const canBook = authRole !== "driver" && authRole !== "admin";
+
   return (
     <section id="services" className="mx-auto max-w-6xl px-4 py-14">
       <div className="text-center">
@@ -51,6 +77,7 @@ export default function Services() {
       <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {services.map((s) => {
           const Icon = s.icon;
+
           return (
             <article
               key={s.title}
@@ -61,19 +88,22 @@ export default function Services() {
                   <h3 className="text-base font-bold text-slate-900">{s.title}</h3>
                   <p className="mt-2 text-sm text-slate-600">{s.description}</p>
                 </div>
+
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900/5">
                   <Icon className="h-5 w-5 text-slate-900" aria-hidden="true" />
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={redirectToBookingOrLogin}
-                className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 transition-colors hover:text-slate-600"
-              >
-                Book this service
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </button>
+              {canBook && (
+                <button
+                  type="button"
+                  onClick={redirectToBookingOrLogin}
+                  className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 transition-colors hover:text-slate-600"
+                >
+                  Book this service
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              )}
             </article>
           );
         })}
@@ -81,4 +111,3 @@ export default function Services() {
     </section>
   );
 }
-

@@ -33,6 +33,7 @@ export default function DriverLayout({
     try {
       const user = JSON.parse(rawUser) as { name?: string };
       if (user.name?.trim()) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setDriverName(user.name.trim());
       }
     } catch {

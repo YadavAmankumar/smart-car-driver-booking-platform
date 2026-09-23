@@ -70,12 +70,26 @@ function validate(form: PricingForm): FormErrors {
   return errors;
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-bold text-slate-900">{title}</p>
-      <div className="mt-4 space-y-4">{children}</div>
-    </div>
+    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="border-b border-slate-100 pb-4">
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {children}
+      </div>
+    </section>
   );
 }
 
@@ -94,11 +108,45 @@ function Field({
 }) {
   const field = fieldByKey[fieldKey];
   const error = errors[fieldKey];
+
+  const percentageFields = [
+    "gstPercent",
+    "nightChargePercent",
+    "weekendChargePercent",
+  ];
+
+  const hourFields = [
+    "driverMinimumHours",
+    "waitingGraceTimeMinutes",
+  ];
+
+  const distanceFields = ["minimumKm"];
+
+  const suffix = percentageFields.includes(fieldKey)
+    ? "%"
+    : hourFields.includes(fieldKey)
+      ? fieldKey === "waitingGraceTimeMinutes"
+        ? "min"
+        : "hrs"
+      : distanceFields.includes(fieldKey)
+        ? "km"
+        : "₹";
+
   return (
-    <div>
-      <label className="mb-1 block text-xs font-semibold text-slate-600" htmlFor={fieldKey}>
-        {field.label}
-      </label>
+    <div className="min-w-0">
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <label
+          className="text-xs font-semibold text-slate-700"
+          htmlFor={fieldKey}
+        >
+          {field.label}
+        </label>
+
+        <span className="shrink-0 text-[11px] font-medium text-slate-400">
+          {suffix}
+        </span>
+      </div>
+
       <Input
         id={fieldKey}
         value={form[fieldKey]}
@@ -106,9 +154,13 @@ function Field({
         min={field.positive ? "0.01" : "0"}
         step="any"
         type="number"
+        className="h-11 rounded-lg border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 shadow-none transition focus:border-slate-400 focus:ring-1 focus:ring-slate-200"
         onChange={(event) => onChange(fieldKey, event.target.value)}
       />
-      {error ? <p className="mt-1 text-xs text-red-600">{error}</p> : null}
+
+      {error ? (
+        <p className="mt-1.5 text-xs text-red-600">{error}</p>
+      ) : null}
     </div>
   );
 }
@@ -201,18 +253,56 @@ export default function AdminPricingPage() {
 
   return (
     <main className="w-full px-6 py-6">
-      <section className="space-y-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div><h1 className="text-lg font-bold text-slate-900">Admin Pricing</h1><p className="mt-1 text-sm text-slate-600">Manage the active pricing configuration.</p></div>
-          <div className="flex gap-3"><Button type="button" variant="secondary" disabled={!form || disabled} onClick={reset}>Reset</Button><Button type="button" variant="primary" disabled={!form || disabled} onClick={() => void save()}>{saving ? <span className="inline-flex items-center gap-2"><LoadingSpinner />Saving…</span> : "Save Changes"}</Button></div>
+      <section className="space-y-6">
+        <div className="flex flex-col gap-5 border-b border-slate-200 pb-6 md:flex-row md:items-end md:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-xl font-bold tracking-tight text-slate-950">
+                Pricing
+              </h1>
+            </div>
+
+            <p className="mt-1.5 max-w-xl text-sm text-slate-500">
+              Configure the rates and charges used across SmartDrive bookings.
+            </p>
+          </div>
+
+          <div className="flex w-full gap-2 sm:w-auto">
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-10 flex-1 rounded-lg px-4 text-sm sm:flex-none"
+              disabled={!form || disabled}
+              onClick={reset}
+            >
+              Reset
+            </Button>
+
+            <Button
+              type="button"
+              variant="primary"
+              className="h-10 flex-1 rounded-lg px-5 text-sm sm:flex-none"
+              disabled={!form || disabled}
+              onClick={() => void save()}
+            >
+              {saving ? (
+                <span className="inline-flex items-center gap-2">
+                  <LoadingSpinner />
+                  Saving…
+                </span>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </div>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           {loading ? <div className="flex items-center gap-3 text-slate-600"><LoadingSpinner />Loading pricing…</div> : error ? <EmptyState title="Unable to load pricing" description={error} /> : !form ? <EmptyState title="Pricing not found" description="An active pricing configuration is required." /> : <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <Section title="🚗 Driver Only">{group(["driverBaseFare", "driverHourlyRate", "driverExtraHourlyRate", "driverMinimumHours"])}</Section>
-            <Section title="🚙 Car With Driver">{group(["acRatePerKm", "nonAcRatePerKm", "minimumKm", "extraKmCharge"])}</Section>
-            <Section title="🌍 Outstation">{group(["driverAllowance", "nightStay", "tollCharge", "stateTax"])}</Section>
-            <Section title="📍 Local">{group(["localBaseFare", "localPerKmRate", "weekendChargePercent"])}</Section>
-            <Section title="🌙 Common Charges">{group(["waitingChargePerMinute", "waitingGraceTimeMinutes", "airportCharge", "gstPercent", "nightChargePercent", "minimumFare"])}</Section>
+            <Section title="Driver Only" description="Hourly pricing when the customer uses their own car.">{group(["driverBaseFare", "driverHourlyRate", "driverExtraHourlyRate", "driverMinimumHours"])}</Section>
+            <Section title="Car With Driver" description="Distance-based pricing for SmartDrive vehicles.">{group(["acRatePerKm", "nonAcRatePerKm", "minimumKm", "extraKmCharge"])}</Section>
+            <Section title="Outstation" description="Additional charges applied to outstation trips.">{group(["driverAllowance", "nightStay", "tollCharge", "stateTax"])}</Section>
+            <Section title="Local" description="Pricing rules for local city bookings.">{group(["localBaseFare", "localPerKmRate", "weekendChargePercent"])}</Section>
+            <Section title="Common Charges" description="Additional charges that can apply across booking types.">{group(["waitingChargePerMinute", "waitingGraceTimeMinutes", "airportCharge", "gstPercent", "nightChargePercent", "minimumFare"])}</Section>
           </div>}
         </div>
       </section>

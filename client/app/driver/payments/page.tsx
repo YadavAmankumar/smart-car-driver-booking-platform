@@ -79,6 +79,7 @@ export default function DriverPaymentsPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPayments();
   }, []);
 

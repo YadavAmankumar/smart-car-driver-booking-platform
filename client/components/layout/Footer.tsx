@@ -2,7 +2,6 @@
 
 import { Mail, MapPin, Phone } from "lucide-react";
 
-import { redirectToBookingOrLogin } from "@/lib/bookingAuth";
 import { siteConfig } from "@/lib/siteConfig";
 
 export default function Footer() {

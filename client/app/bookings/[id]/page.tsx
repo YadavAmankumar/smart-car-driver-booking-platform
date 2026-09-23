@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import CustomerDashboardLayout from "@/components/customer/CustomerDashboardLayout";
 import BookingStatusBadges from "@/components/customer/BookingStatusBadges";
 import BookingTimeline from "@/components/customer/BookingTimeline";
-import { Badge, Button, Card, CardContent, Input } from "@/components/ui/primitives";
+import { Badge, Button, Card, CardContent } from "@/components/ui/primitives";
 import {
   cancelBooking,
   getBookingById,

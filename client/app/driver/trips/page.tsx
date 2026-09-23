@@ -78,7 +78,9 @@ export default function DriverTripsPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadTrips();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const trips = useMemo(() => {
@@ -153,9 +155,6 @@ export default function DriverTripsPage() {
 
             const isStarting =
               busyId === bookingId && booking.bookingStatus === "Confirmed";
-
-            const isCompleting =
-              busyId === bookingId && booking.bookingStatus === "Ongoing";
 
             return (
               <Card key={bookingId || `${booking.bookingDate}-${customerName}`}>

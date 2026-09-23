@@ -2,15 +2,53 @@
 
 import Image from "next/image";
 import { motion } from "framer-motion";
-import {
-  ArrowRight,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { redirectToBookingOrLogin } from "@/lib/bookingAuth";
 
+type Role = "customer" | "driver" | "admin";
 
+function getStoredRole(): Role | null {
+  if (typeof window === "undefined") return null;
+
+  const rawRole = localStorage.getItem("role");
+
+  if (rawRole === "customer" || rawRole === "driver" || rawRole === "admin") {
+    return rawRole;
+  }
+
+  return null;
+}
 
 export default function Hero() {
+  const [authRole, setAuthRole] = useState<Role | null>(null);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAuthRole(getStoredRole());
+  }, []);
+
+  function handlePrimaryAction() {
+    if (authRole === "admin") {
+      window.location.href = "/admin/dashboard";
+      return;
+    }
+
+    if (authRole === "driver") {
+      window.location.href = "/driver/dashboard";
+      return;
+    }
+
+    redirectToBookingOrLogin();
+  }
+
+  function getPrimaryActionLabel() {
+    if (authRole === "admin") return "Admin Dashboard";
+    if (authRole === "driver") return "Driver Dashboard";
+    return "Book Your Ride";
+  }
+
   return (
     <section
       id="home"
@@ -46,10 +84,10 @@ export default function Hero() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <button
               type="button"
-              onClick={redirectToBookingOrLogin}
+              onClick={handlePrimaryAction}
               className="group inline-flex items-center justify-center rounded-xl bg-slate-950 px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-slate-950/15 transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-900 hover:shadow-slate-950/20 active:translate-y-0"
             >
-              Book Your Ride
+              {getPrimaryActionLabel()}
               <span className="ml-2 flex h-6 w-6 items-center justify-center rounded-full bg-white/10">
                 <ArrowRight
                   className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
@@ -65,7 +103,6 @@ export default function Hero() {
               Explore Services
             </a>
           </div>
-
         </motion.div>
 
         {/* Right visual */}

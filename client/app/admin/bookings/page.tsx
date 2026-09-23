@@ -1335,7 +1335,7 @@ function AssignTripDialog({
 
           const availableCars =
             allCars.filter(
-              (car: any) =>
+              (car) =>
                 car?.isAvailable ===
                 true,
             );
@@ -1836,7 +1836,7 @@ function AssignTripDialog({
                 </span>
 
                 <span className="font-semibold text-slate-900">
-                  Customer's own car
+                  Customer&apos;s own car
                 </span>
               </div>
             )}

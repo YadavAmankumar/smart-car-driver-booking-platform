@@ -10,6 +10,12 @@ const {
   refreshResourceAvailability,
 } = require("../../services/bookingLifecycleService");
 
+const sendLifecycleError = (res, error) =>
+  res.status(error.statusCode || 409).json({
+    success: false,
+    message: error.message,
+  });
+
 const UTR_PATTERN = /^[A-Za-z0-9/-]{8,35}$/;
 
 const findDriverByUser = (user) => Driver.findOne({ user: user._id });

@@ -1,7 +1,5 @@
 import { CarFront, Route, ShieldCheck, Users } from "lucide-react";
 
-import { redirectToBookingOrLogin } from "@/lib/bookingAuth";
-
 type CarOption = {
   title: "Comfort Cars" | "Spacious SUVs" | "Premium Cars" | "Group Travel";
   description: string;

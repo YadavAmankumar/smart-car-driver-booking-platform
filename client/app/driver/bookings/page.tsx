@@ -176,10 +176,6 @@ export default function DriverBookingsPage() {
               bookingId !== undefined &&
               busy === `start:${bookingId}`;
 
-            const completeBusy =
-              bookingId !== undefined &&
-              busy === `complete:${bookingId}`;
-
             return (
               <Card key={bookingId || `booking-${index}`}>
                 <CardHeader>
