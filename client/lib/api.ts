@@ -537,6 +537,16 @@ export async function startDriverBooking(bookingId: string) {
   return res.data;
 }
 
+export async function completeDriverBooking(bookingId: string) {
+  const token = getAuthToken();
+  const res = await api.post<{ success: boolean; message?: string; data: DriverBooking }>(
+    `/drivers/me/bookings/${bookingId}/complete`,
+    {},
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
 export async function confirmDriverCashCollection(paymentId: string) {
   const token = getAuthToken();
   const res = await api.put<{ success: boolean; message?: string; data: PaymentRecord }>(

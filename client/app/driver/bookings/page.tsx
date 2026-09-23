@@ -19,6 +19,7 @@ import {
   getCustomerProfile,
   getDriverBookings,
   startDriverBooking,
+  completeDriverBooking,
   type DriverBooking,
 } from "@/lib/api";
 
@@ -111,12 +112,25 @@ export default function DriverBookingsPage() {
     };
   }, [router]);
 
-  const handleTripAction = async (bookingId: string) => {
-    try {
-      setBusy(`start:${bookingId}`);
+  const activeBooking = bookings.find((booking) => {
+    const status = String(booking.bookingStatus || "");
+    return status === "Confirmed" || status === "Ongoing";
+  });
 
-      await startDriverBooking(bookingId);
-      toast.success("Trip started successfully");
+  const handleTripAction = async (
+    bookingId: string,
+    action: "start" | "complete",
+  ) => {
+    try {
+      setBusy(`${action}:${bookingId}`);
+
+      if (action === "start") {
+        await startDriverBooking(bookingId);
+        toast.success("Trip started successfully");
+      } else {
+        await completeDriverBooking(bookingId);
+        toast.success("Trip completed successfully");
+      }
 
       await refresh();
     } catch (e) {
@@ -143,29 +157,29 @@ export default function DriverBookingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">
-          My Bookings
+          Active Booking
         </h1>
 
         <p className="mt-1 text-sm text-slate-600">
-          View bookings assigned to you and manage your active trips.
+          View and manage your current assigned trip.
         </p>
       </div>
 
-      {bookings.length === 0 ? (
+      {!activeBooking ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-sm font-semibold text-slate-900">
-              No bookings assigned
+              No active booking
             </p>
 
             <p className="mt-1 text-sm text-slate-500">
-              Assigned trips will appear here.
+              Your next confirmed trip will appear here.
             </p>
           </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">
-          {bookings.map((booking, index) => {
+          {[activeBooking].map((booking) => {
             const bookingId = booking._id;
 
             const status = String(
@@ -177,7 +191,7 @@ export default function DriverBookingsPage() {
               busy === `start:${bookingId}`;
 
             return (
-              <Card key={bookingId || `booking-${index}`}>
+              <Card key={bookingId || "active-booking"}>
                 <CardHeader>
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -302,9 +316,7 @@ export default function DriverBookingsPage() {
                             type="button"
                             disabled={busy !== null}
                             onClick={() =>
-                              void handleTripAction(
-                                bookingId,
-                              )
+                              void handleTripAction(bookingId, "start")
                             }
                           >
                             {startBusy

@@ -121,11 +121,17 @@ export default function DriverPaymentsPage() {
     }
   };
 
-  const pendingPayments = payments.filter(
-    (payment) =>
-      payment.paymentStatus === "Pending" ||
-      payment.paymentStatus === "Verification Pending",
+  const activePayment = payments.find(
+    (payment) => payment.bookingStatus === "Ongoing",
   );
+
+  const pendingPayments = activePayment
+    ? [activePayment].filter(
+        (payment) =>
+          payment.paymentStatus === "Pending" ||
+          payment.paymentStatus === "Verification Pending",
+      )
+    : [];
 
   const paidCash = payments
     .filter(
@@ -225,8 +231,10 @@ export default function DriverPaymentsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {payments.map((payment, index) => {
-                const paymentId = payment._id ?? `payment-${index}`;
+              {activePayment ? (
+                (() => {
+                  const payment = activePayment;
+                  const paymentId = payment._id ?? "active-payment";
                 const isCash = payment.paymentMethod === "Cash";
                 const isOnline = payment.paymentMethod === "UPI";
                 const isPending =
@@ -322,7 +330,7 @@ export default function DriverPaymentsPage() {
                       <div className="lg:w-64">
                         {isCash &&
                         payment.paymentStatus === "Pending" &&
-                        bookingStatus === "Completed" ? (
+                        bookingStatus === "Ongoing" ? (
                           <Button
                             className="w-full"
                             disabled={busyId === paymentId}
@@ -361,7 +369,17 @@ export default function DriverPaymentsPage() {
                     </div>
                   </div>
                 );
-              })}
+                })()
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center">
+                  <p className="font-semibold text-slate-700">
+                    No active payment
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Payment details will appear when you have an ongoing trip.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </CardContent>

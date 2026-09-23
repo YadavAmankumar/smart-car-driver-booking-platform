@@ -8,12 +8,10 @@ import { clearSession } from "@/lib/session";
 
 const navItems = [
   { label: "Dashboard", href: "/driver/dashboard" },
+  { label: "Active Booking", href: "/driver/bookings" },
+  { label: "Payment / Cash Collection", href: "/driver/payments" },
+  { label: "Earnings / History", href: "/driver/earnings" },
   { label: "My Profile", href: "/driver/profile" },
-  { label: "Assigned Bookings", href: "/driver/bookings" },
-  { label: "Assigned Car", href: "/driver/car" },
-  { label: "Trip Details", href: "/driver/trips" },
-  { label: "Payment/Cash Collection", href: "/driver/payments" },
-  { label: "Earnings/History", href: "/driver/earnings" },
 ];
 
 export default function DriverLayout({

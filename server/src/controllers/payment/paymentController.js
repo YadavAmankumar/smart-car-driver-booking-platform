@@ -4,17 +4,6 @@ const Payment = require("../../models/Payment");
 const Booking = require("../../models/Booking");
 const Driver = require("../../models/Driver");
 const asyncHandler = require("../../utils/asyncHandler");
-const {
-  BookingLifecycleError,
-  transitionBooking,
-  refreshResourceAvailability,
-} = require("../../services/bookingLifecycleService");
-
-const sendLifecycleError = (res, error) =>
-  res.status(error.statusCode || 409).json({
-    success: false,
-    message: error.message,
-  });
 
 const UTR_PATTERN = /^[A-Za-z0-9/-]{8,35}$/;
 
@@ -97,19 +86,6 @@ exports.markCashCollected = asyncHandler(async (req, res) => {
 
   const now = new Date();
 
-  try {
-    transitionBooking(
-      booking,
-      "Completed",
-      req.user._id,
-      "Trip completed after cash collection by assigned driver",
-    );
-  } catch (err) {
-    if (err instanceof BookingLifecycleError) return sendLifecycleError(res, err);
-    throw err;
-  }
-
-  booking.completedAt = now;
   payment.paymentStatus = "Paid";
   payment.verificationStatus = "Approved";
   payment.verifiedBy = driver._id;
@@ -120,7 +96,6 @@ exports.markCashCollected = asyncHandler(async (req, res) => {
   await payment.save();
   await syncBookingPayment(payment, "Paid");
   await booking.save();
-  await refreshResourceAvailability(booking);
 
   const updatedPayment = await paymentPopulate(Payment.findById(id));
   res.status(200).json({
@@ -196,20 +171,6 @@ exports.confirmDriverOnlinePayment = asyncHandler(async (req, res) => {
 
   const now = new Date();
 
-  try {
-    transitionBooking(
-      booking,
-      "Completed",
-      req.user._id,
-      "Trip completed after UPI payment confirmation by assigned driver",
-    );
-  } catch (err) {
-    if (err instanceof BookingLifecycleError) return sendLifecycleError(res, err);
-    throw err;
-  }
-
-  booking.completedAt = now;
-
   payment.amount = booking.totalAmount;
   payment.paymentStatus = "Paid";
   payment.verificationStatus = "Approved";
@@ -223,7 +184,6 @@ exports.confirmDriverOnlinePayment = asyncHandler(async (req, res) => {
 
   await syncBookingPayment(payment, "Paid");
   await booking.save();
-  await refreshResourceAvailability(booking);
 
   const updatedPayment = await paymentPopulate(Payment.findById(id));
 
