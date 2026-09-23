@@ -417,34 +417,60 @@ export default function Navbar() {
 
                 <div className="space-y-1 py-1">
                   <Link
-                    href="/dashboard"
+                    href={
+                      authRole === "admin"
+                        ? "/admin/dashboard"
+                        : authRole === "driver"
+                          ? "/driver/dashboard"
+                          : "/dashboard"
+                    }
                     role="menuitem"
                     className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
                     onClick={() => setUserMenuOpen(false)}
                   >
                     <LayoutDashboard className="h-4 w-4 text-slate-400" />
-                    My Dashboard
+                    {authRole === "admin"
+                      ? "Admin Dashboard"
+                      : authRole === "driver"
+                        ? "Driver Dashboard"
+                        : "My Dashboard"}
                   </Link>
 
-                  <Link
-                    href="/bookings"
-                    role="menuitem"
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
-                    onClick={() => setUserMenuOpen(false)}
-                  >
-                    <CalendarDays className="h-4 w-4 text-slate-400" />
-                    My Bookings
-                  </Link>
+                  {authRole !== "admin" && (
+                    <Link
+                      href={authRole === "driver" ? "/driver/bookings" : "/bookings"}
+                      role="menuitem"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <CalendarDays className="h-4 w-4 text-slate-400" />
+                      {authRole === "driver" ? "Assigned Bookings" : "My Bookings"}
+                    </Link>
+                  )}
 
-                  <Link
-                    href="/profile"
-                    role="menuitem"
-                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
-                    onClick={() => setUserMenuOpen(false)}
-                  >
-                    <UserCircle className="h-4 w-4 text-slate-400" />
-                    Profile
-                  </Link>
+                  {authRole !== "admin" && (
+                    <Link
+                      href={authRole === "driver" ? "/driver/profile" : "/profile"}
+                      role="menuitem"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <UserCircle className="h-4 w-4 text-slate-400" />
+                      Profile
+                    </Link>
+                  )}
+
+                  {authRole === "admin" && (
+                    <Link
+                      href="/profile"
+                      role="menuitem"
+                      className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <UserCircle className="h-4 w-4 text-slate-400" />
+                      Profile
+                    </Link>
+                  )}
                 </div>
 
                 <div className="my-1 border-t border-slate-100" />
@@ -572,25 +598,37 @@ export default function Navbar() {
                 </div>
 
                 <Link
-                  href="/dashboard"
+                  href={
+                    authRole === "admin"
+                      ? "/admin/dashboard"
+                      : authRole === "driver"
+                        ? "/driver/dashboard"
+                        : "/dashboard"
+                  }
                   className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white"
                   onClick={() => setOpenMobileMenu(false)}
                 >
                   <LayoutDashboard className="h-4 w-4 text-slate-400" />
-                  My Dashboard
+                  {authRole === "admin"
+                    ? "Admin Dashboard"
+                    : authRole === "driver"
+                      ? "Driver Dashboard"
+                      : "My Dashboard"}
                 </Link>
 
-                <Link
-                  href="/bookings"
-                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white"
-                  onClick={() => setOpenMobileMenu(false)}
-                >
-                  <CalendarDays className="h-4 w-4 text-slate-400" />
-                  My Bookings
-                </Link>
+                {authRole !== "admin" && (
+                  <Link
+                    href={authRole === "driver" ? "/driver/bookings" : "/bookings"}
+                    className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white"
+                    onClick={() => setOpenMobileMenu(false)}
+                  >
+                    <CalendarDays className="h-4 w-4 text-slate-400" />
+                    {authRole === "driver" ? "Assigned Bookings" : "My Bookings"}
+                  </Link>
+                )}
 
                 <Link
-                  href="/profile"
+                  href={authRole === "driver" ? "/driver/profile" : "/profile"}
                   className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 hover:bg-white"
                   onClick={() => setOpenMobileMenu(false)}
                 >
@@ -616,7 +654,7 @@ export default function Navbar() {
               onClick={onPrimaryAction}
               className="group mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-slate-950/15 transition hover:bg-slate-900"
             >
-              Book Now
+              {getPrimaryActionLabel()}
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10">
                 <svg
                   className="h-3.5 w-3.5"

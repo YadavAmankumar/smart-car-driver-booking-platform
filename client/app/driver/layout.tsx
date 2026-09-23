@@ -9,7 +9,7 @@ import { clearSession } from "@/lib/session";
 const navItems = [
   { label: "Dashboard", href: "/driver/dashboard" },
   { label: "My Profile", href: "/driver/profile" },
-  { label: "My Bookings", href: "/driver/bookings" },
+  { label: "Assigned Bookings", href: "/driver/bookings" },
   { label: "Assigned Car", href: "/driver/car" },
   { label: "Trip Details", href: "/driver/trips" },
   { label: "Payment/Cash Collection", href: "/driver/payments" },
