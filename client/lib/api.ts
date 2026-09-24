@@ -493,6 +493,24 @@ export async function getAdminPayments() {
   return res.data;
 }
 
+export type AdminPaymentRevenue = {
+  todayRevenue: number;
+  monthlyRevenue: number;
+  cashRevenue: number;
+  upiRevenue: number;
+  totalRevenue: number;
+  pendingAmount: number;
+};
+
+export async function getAdminPaymentRevenue() {
+  const token = getAuthToken();
+  const res = await api.get<{ success: boolean; data: AdminPaymentRevenue }>(
+    "/payments/admin/revenue",
+    { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
+  );
+  return res.data;
+}
+
 export type DriverProfile = {
   id?: string;
   driverName?: string;

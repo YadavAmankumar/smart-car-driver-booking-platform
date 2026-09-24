@@ -1,124 +1,94 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Badge, Card, CardContent } from "@/components/ui/primitives";
-import { getAdminPayments, type PaymentRecord } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/primitives";
+import { getAdminPaymentRevenue, type AdminPaymentRevenue } from "@/lib/api";
 
 function money(amount?: number) {
-  return new Intl.NumberFormat(undefined, {
+  return new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
     maximumFractionDigits: 0,
   }).format(typeof amount === "number" ? amount : 0);
 }
 
-function statusTone(status?: string): "neutral" | "blue" | "green" | "amber" | "red" {
-  if (status === "Paid") return "green";
-  if (status === "Verification Pending") return "amber";
-  if (status === "Rejected" || status === "Cancelled") return "red";
-  if (status === "Refunded") return "blue";
-  return "neutral";
-}
-
-function bookingLabel(payment: PaymentRecord) {
-  const booking = payment.bookingId as { _id?: string; customerName?: string } | undefined;
-  return booking?.customerName || booking?._id || "-";
-}
-
 export default function AdminPaymentsPage() {
-  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [revenue, setRevenue] = useState<AdminPaymentRevenue | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function load() {
+  async function loadRevenue() {
     setLoading(true);
+
     try {
-      const res = await getAdminPayments();
-      setPayments(res.data || []);
+      const res = await getAdminPaymentRevenue();
+      setRevenue(res.data);
     } catch {
-      toast.error("Failed to load payments.");
+      toast.error("Failed to load payment summary.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    queueMicrotask(() => void load());
+    queueMicrotask(() => void loadRevenue());
   }, []);
 
-  const verificationPending = useMemo(
-    () => payments.filter((payment) => payment.paymentStatus === "Verification Pending").length,
-    [payments],
-  );
+  const cards = [
+    {
+      label: "Total Received",
+      value: revenue?.totalRevenue,
+    },
+    {
+      label: "Today",
+      value: revenue?.todayRevenue,
+    },
+    {
+      label: "This Month",
+      value: revenue?.monthlyRevenue,
+    },
+    {
+      label: "Cash",
+      value: revenue?.cashRevenue,
+    },
+    {
+      label: "UPI",
+      value: revenue?.upiRevenue,
+    },
+  ];
 
   return (
     <section className="space-y-6">
       <div>
         <h1 className="text-2xl font-extrabold text-slate-900">Payments</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Monitor payment records and driver-confirmed payment status.
+          Payment summary from all drivers.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {loading ? (
         <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-semibold text-slate-600">Total Payments</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{payments.length}</p>
+          <CardContent className="p-6 text-sm text-slate-600">
+            Loading payment summary...
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-semibold text-slate-600">UPI Awaiting Verification</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">{verificationPending}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-xs font-semibold text-slate-600">Paid Revenue</p>
-            <p className="mt-1 text-2xl font-bold text-slate-900">
-              {money(payments.reduce((sum, payment) => payment.paymentStatus === "Paid" ? sum + (payment.amount || 0) : sum, 0))}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {cards.map((card) => (
+            <Card key={card.label}>
+              <CardContent className="p-5">
+                <p className="text-sm font-semibold text-slate-600">
+                  {card.label}
+                </p>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="p-6 text-sm text-slate-600">Loading payments...</div>
-          ) : payments.length === 0 ? (
-            <div className="p-6 text-sm text-slate-600">No payments found.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs font-semibold text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3">Booking / Customer</th>
-                    <th className="px-4 py-3">Method</th>
-                    <th className="px-4 py-3">Amount</th>
-                    <th className="px-4 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((payment) => {
-                    return (
-                      <tr key={payment._id} className="border-t border-slate-100">
-                        <td className="px-4 py-3 font-semibold text-slate-900">{bookingLabel(payment)}</td>
-                        <td className="px-4 py-3 text-slate-700">{payment.paymentMethod || "-"}</td>
-                        <td className="px-4 py-3 text-slate-700">{money(payment.amount)}</td>
-                        <td className="px-4 py-3">
-                          <Badge tone={statusTone(payment.paymentStatus)}>{payment.paymentStatus || "Pending"}</Badge>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <p className="mt-2 text-3xl font-extrabold text-slate-900">
+                  {money(card.value)}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
