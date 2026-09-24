@@ -80,6 +80,19 @@ function formatExperience(v?: number): string {
   return `${v} yrs`;
 }
 
+function getDriverInitials(name?: string): string {
+  const value = name?.trim();
+  if (!value) return "DR";
+
+  const parts = value.split(/\s+/).filter(Boolean);
+
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
 function getDriverId(d?: Driver | null): string {
   return d?._id ?? d?.id ?? "";
 }
@@ -267,6 +280,19 @@ export default function AdminDriversPage() {
       );
     });
   }, [drivers, search]);
+
+  const driverStats = useMemo(() => {
+    const available = drivers.filter((d) => d.status === "Available").length;
+    const busy = drivers.filter((d) => d.status === "Busy").length;
+    const linkedAccounts = drivers.filter((d) => d.accountProvisioned).length;
+
+    return {
+      total: drivers.length,
+      available,
+      busy,
+      linkedAccounts,
+    };
+  }, [drivers]);
 
   const totalPages = Math.max(1, Math.ceil(filteredDrivers.length / pageSize));
   const safePage = Math.min(page, totalPages);
@@ -561,8 +587,61 @@ export default function AdminDriversPage() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="w-full sm:w-72">
+          <Button
+            type="button"
+            variant="primary"
+            className="border-[#0F172A] bg-[#0F172A] text-white shadow-sm hover:border-black hover:bg-black"
+            onClick={openAdd}
+          >
+            Add Driver
+          </Button>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-slate-500">Total Drivers</p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {driverStats.total}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Registered driver profiles
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-emerald-600">Available</p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {driverStats.available}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Ready for assignment
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-amber-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-amber-600">Busy</p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {driverStats.busy}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Currently assigned
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            <p className="text-sm font-medium text-blue-600">Linked Accounts</p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">
+              {driverStats.linkedAccounts}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Admin-managed login accounts
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="w-full md:max-w-3xl">
               <Input
                 value={search}
                 onChange={(e) => {
@@ -573,9 +652,9 @@ export default function AdminDriversPage() {
               />
             </div>
 
-            <Button type="button" variant="primary" onClick={openAdd}>
-              Add Driver
-            </Button>
+            <p className="shrink-0 text-sm font-medium text-slate-500">
+              Showing {filteredDrivers.length} drivers
+            </p>
           </div>
         </div>
 
@@ -628,17 +707,49 @@ export default function AdminDriversPage() {
                     const accountStatus = d.account?.status;
                     return (
                       <tr key={id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 font-semibold text-slate-800">
-                          {d.driverName ?? "—"}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
+                              {getDriverInitials(d.driverName)}
+                            </div>
+
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-slate-900">
+                                {d.driverName ?? "—"}
+                              </p>
+                              <p className="mt-0.5 text-xs text-slate-500">
+                                ID: {id || "—"}
+                              </p>
+                            </div>
+                          </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {formatPhone(d.phoneNumber)}
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-medium text-slate-700">
+                            {formatPhone(d.phoneNumber)}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            Contact
+                          </p>
                         </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {d.account?.email ?? "—"}
+
+                        <td className="px-4 py-3">
+                          {d.account?.email ? (
+                            <p className="max-w-[220px] truncate text-sm font-medium text-slate-700">
+                              {d.account.email}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-slate-400">No account email</p>
+                          )}
                         </td>
-                        <td className="px-4 py-3 text-slate-600">
-                          {formatExperience(d.experience)}
+                        <td className="px-4 py-3">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-700">
+                              {formatExperience(d.experience)}
+                            </p>
+                            <p className="mt-0.5 text-xs text-slate-400">
+                              Experience
+                            </p>
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <Badge tone={statusTone(status)}>
