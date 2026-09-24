@@ -52,6 +52,38 @@ type Booking = {
   createdAt?: string;
 };
 
+export type AdminBooking = Booking & {
+  totalAmount?: number;
+  estimatedFare?: number;
+  pricing?: {
+    estimatedTotal?: number;
+  };
+  driver?: {
+    _id?: string;
+    driverName?: string;
+    phoneNumber?: string;
+  } | null;
+  car?: {
+    _id?: string;
+    carNumber?: string;
+    carModel?: string;
+  } | null;
+  payment?: {
+    amount?: number;
+    paymentMethod?: string;
+    paymentStatus?: string;
+    verificationStatus?: string;
+    verifiedBy?: {
+      _id?: string;
+      driverName?: string;
+      phoneNumber?: string;
+    } | null;
+    verifiedByModel?: string;
+    verifiedType?: string;
+    verifiedAt?: string | null;
+    paidAt?: string | null;
+  } | null;
+};
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_URL?.trim() ||
@@ -278,7 +310,11 @@ export async function getAllBookings() {
   return res.data;
 }
 
-export type AdminGetBookingsResponse = GetBookingsResponse;
+export type AdminGetBookingsResponse = {
+  success: boolean;
+  count?: number;
+  data: AdminBooking[];
+};
 
 export async function getAdminBookings(params?: {
   status?: "Pending" | "Confirmed" | "Ongoing" | "Completed" | "Cancelled";

@@ -241,10 +241,70 @@ exports.getAdminBookings = asyncHandler(async (req, res) => {
     .populate("car")
     .sort({ createdAt: -1 });
 
+  const bookingIds = bookings.map((booking) => booking._id);
+
+  const payments = await Payment.find({
+    bookingId: { $in: bookingIds },
+  }).select(
+    "bookingId amount paymentMethod paymentStatus verificationStatus verifiedBy verifiedByModel verifiedType verifiedAt paidAt"
+  );
+
+  const verifiedDriverIds = payments
+    .filter(
+      (payment) =>
+        payment.verifiedBy &&
+        payment.verifiedByModel === "Driver"
+    )
+    .map((payment) => payment.verifiedBy);
+
+  const drivers = await Driver.find({
+    _id: { $in: verifiedDriverIds },
+  }).select("driverName phoneNumber");
+
+  const driverMap = new Map(
+    drivers.map((driver) => [
+      String(driver._id),
+      {
+        _id: driver._id,
+        driverName: driver.driverName,
+        phoneNumber: driver.phoneNumber,
+      },
+    ])
+  );
+
+  const paymentMap = new Map(
+    payments.map((payment) => {
+      const verifiedDriver =
+        payment.verifiedByModel === "Driver" && payment.verifiedBy
+          ? driverMap.get(String(payment.verifiedBy))
+          : null;
+
+      return [
+        String(payment.bookingId),
+        {
+          amount: payment.amount,
+          paymentMethod: payment.paymentMethod,
+          paymentStatus: payment.paymentStatus,
+          verificationStatus: payment.verificationStatus,
+          verifiedBy: verifiedDriver,
+          verifiedByModel: payment.verifiedByModel,
+          verifiedType: payment.verifiedType,
+          verifiedAt: payment.verifiedAt,
+          paidAt: payment.paidAt,
+        },
+      ];
+    })
+  );
+
+  const data = bookings.map((booking) => ({
+    ...booking.toObject(),
+    payment: paymentMap.get(String(booking._id)) || null,
+  }));
+
   res.status(200).json({
     success: true,
-    count: bookings.length,
-    data: bookings,
+    count: data.length,
+    data,
   });
 });
 

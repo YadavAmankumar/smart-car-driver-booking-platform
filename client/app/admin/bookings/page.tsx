@@ -75,6 +75,21 @@ type BookingRow = {
   };
   totalAmount?: number;
   estimatedFare?: number;
+  payment?: {
+    amount?: number;
+    paymentMethod?: string;
+    paymentStatus?: string;
+    verificationStatus?: string;
+    verifiedBy?: {
+      _id?: string;
+      driverName?: string;
+      phoneNumber?: string;
+    } | null;
+    verifiedByModel?: string;
+    verifiedType?: string;
+    verifiedAt?: string | null;
+    paidAt?: string | null;
+  } | null;
 };
 
 function formatDate(dateString?: string): string {
@@ -567,8 +582,27 @@ export default function AdminBookingsPage() {
                           ?.estimatedTotal,
                     );
 
-                    const payment =
-                      b.paymentMethod ?? "—";
+                    const paymentMethod =
+                      b.payment?.paymentMethod ??
+                      b.paymentMethod ??
+                      "—";
+
+                    const paymentAmount = formatMoney(
+                      b.payment?.amount ??
+                        b.totalAmount ??
+                        b.estimatedFare ??
+                        b.pricing?.estimatedTotal,
+                    );
+
+                    const paymentStatus =
+                      b.payment?.paymentStatus ?? "Pending";
+
+                    const paymentDriver =
+                      b.payment?.verifiedBy?.driverName ??
+                      "";
+
+                    const paymentVerifiedType =
+                      b.payment?.verifiedType ?? "";
 
                     const status =
                       (
@@ -627,8 +661,31 @@ export default function AdminBookingsPage() {
                           {fare}
                         </td>
 
-                        <td className="px-4 py-3 text-slate-600">
-                          {payment}
+                        <td className="px-4 py-3">
+                          <div className="min-w-44">
+                            <div className="font-semibold text-slate-900">
+                              {paymentAmount}
+                            </div>
+
+                            <div className="mt-1 text-xs font-medium text-slate-500">
+                              {paymentMethod}
+                            </div>
+
+                            {paymentStatus === "Paid" && paymentDriver ? (
+                              <div className="mt-2 text-xs font-semibold text-emerald-700">
+                                {paymentVerifiedType === "Cash Collection"
+                                  ? `Cash Collected by ${paymentDriver}`
+                                  : paymentVerifiedType ===
+                                      "UPI Driver Confirmation"
+                                    ? `UPI confirmed by ${paymentDriver}`
+                                    : `Payment confirmed by ${paymentDriver}`}
+                              </div>
+                            ) : (
+                              <div className="mt-2 text-xs font-medium text-amber-600">
+                                {paymentStatus}
+                              </div>
+                            )}
+                          </div>
                         </td>
 
                         <td className="px-4 py-3">
