@@ -34,6 +34,19 @@ function getBookingId(bookingId: unknown) {
   return "N/A";
 }
 
+function getBookingStatus(bookingId: unknown) {
+  if (
+    typeof bookingId === "object" &&
+    bookingId !== null &&
+    "bookingStatus" in bookingId
+  ) {
+    const value = (bookingId as { bookingStatus?: unknown }).bookingStatus;
+    return typeof value === "string" ? value : undefined;
+  }
+
+  return undefined;
+}
+
 function formatDate(value?: string) {
   if (!value) return "N/A";
 
@@ -122,7 +135,7 @@ export default function DriverPaymentsPage() {
   };
 
   const activePayment = payments.find(
-    (payment) => payment.bookingStatus === "Ongoing",
+    (payment) => getBookingStatus(payment.bookingId) === "Ongoing",
   );
 
   const pendingPayments = activePayment
@@ -241,7 +254,7 @@ export default function DriverPaymentsPage() {
                   payment.paymentStatus === "Pending" ||
                   payment.paymentStatus === "Verification Pending";
                 const isPaid = payment.paymentStatus === "Paid";
-                const bookingStatus = payment.bookingStatus;
+                const bookingStatus = getBookingStatus(payment.bookingId);
 
                 return (
                   <div
@@ -354,11 +367,15 @@ export default function DriverPaymentsPage() {
                           >
                             {busyId === paymentId
                               ? "Confirming..."
-                              : "Online Payment Confirmed"}
+                              : "Confirm UPI Payment"}
                           </Button>
                         ) : isPaid ? (
                           <div className="rounded-lg bg-green-50 p-3 text-center text-sm font-semibold text-green-700">
-                            Payment confirmed and marked as Paid.
+                            {payment.verifiedType === "Cash Collection"
+                              ? `Cash Collected by ${payment.verifiedBy?.driverName ?? payment.verifiedBy?.name ?? "Driver"}`
+                              : payment.verifiedType === "UPI Driver Confirmation"
+                                ? `UPI Verified by ${payment.verifiedBy?.driverName ?? payment.verifiedBy?.name ?? "Driver"}`
+                                : "Payment confirmed and marked as Paid."}
                           </div>
                         ) : (
                           <div className="rounded-lg bg-slate-50 p-3 text-center text-sm text-slate-600">

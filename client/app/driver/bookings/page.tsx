@@ -190,6 +190,10 @@ export default function DriverBookingsPage() {
               bookingId !== undefined &&
               busy === `start:${bookingId}`;
 
+            const completeBusy =
+              bookingId !== undefined &&
+              busy === `complete:${bookingId}`;
+
             return (
               <Card key={bookingId || "active-booking"}>
                 <CardHeader>
@@ -324,6 +328,21 @@ export default function DriverBookingsPage() {
                               : "Start Trip"}
                           </Button>
                         )}
+
+                        {status === "Ongoing" &&
+                          booking.paymentStatus === "Paid" && (
+                            <Button
+                              type="button"
+                              disabled={busy !== null}
+                              onClick={() =>
+                                void handleTripAction(bookingId, "complete")
+                              }
+                            >
+                              {completeBusy
+                                ? "Completing..."
+                                : "Complete Trip"}
+                            </Button>
+                          )}
 
                       </div>
                     )}

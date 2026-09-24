@@ -868,7 +868,7 @@ export default function BookingForm() {
                         description={
                           pm === "Cash"
                             ? "Pay the assigned driver after trip completion."
-                            : "Scan the business QR and submit your UTR for admin verification."
+                            : "Select UPI and ask the driver for the correct QR code. Scan the QR provided by the driver and complete the payment. The driver will verify the payment before completing the trip."
                         }
                       />
                     ))}

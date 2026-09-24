@@ -411,6 +411,12 @@ export type PaymentRecord = {
   bookingStatus?: string;
   transactionId?: string;
   verificationStatus?: string;
+  verifiedBy?: {
+    name?: string;
+    email?: string;
+    driverName?: string;
+  } | null;
+  verifiedType?: string;
   remarks?: string;
   verifiedAt?: string;
   createdAt?: string;

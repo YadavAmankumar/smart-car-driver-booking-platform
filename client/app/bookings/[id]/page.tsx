@@ -358,11 +358,7 @@ export default function BookingDetailsPage() {
                           alt="Business UPI QR code"
                           className="mx-auto h-44 w-44 rounded-lg border border-slate-200 bg-white object-contain p-2"
                         />
-                      ) : (
-                        <p className="text-xs text-amber-700">
-                          UPI QR configuration is not available yet.
-                        </p>
-                      )}
+                      ) : null}
 
                       {paymentConfig?.upiId ? (
                         <p className="break-all text-xs text-slate-600">
