@@ -22,6 +22,11 @@ const carSchema = new mongoose.Schema(
       required: [true, "Fuel type is required"],
       enum: ["Petrol", "Diesel", "CNG", "EV"],
     },
+    vehicleCategory: {
+      type: String,
+      required: [true, "Vehicle category is required"],
+      enum: ["Mini", "Sedan", "XL – 7 Seater", "Force Traveller"],
+    },
     isAC: {
       type: Boolean,
       default: false,
@@ -29,6 +34,14 @@ const carSchema = new mongoose.Schema(
     isAvailable: {
       type: Boolean,
       default: true,
+    },
+    imageUrl: {
+      type: String,
+      default: "",
+    },
+    imagePublicId: {
+      type: String,
+      default: "",
     },
   },
   { timestamps: true }

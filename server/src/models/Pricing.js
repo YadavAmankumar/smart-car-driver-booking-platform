@@ -1,5 +1,45 @@
 const mongoose = require("mongoose");
 
+const vehiclePricingSchema = new mongoose.Schema(
+  {
+    baseFare: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    ratePerKm: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+    minimumKm: {
+      type: Number,
+      required: true,
+      min: 1,
+    },
+    extraKmCharge: {
+      type: Number,
+      required: true,
+      min: 0,
+    },
+  },
+  { _id: false }
+);
+
+const vehicleCategoryPricingSchema = new mongoose.Schema(
+  {
+    ac: {
+      type: vehiclePricingSchema,
+      required: true,
+    },
+    nonAc: {
+      type: vehiclePricingSchema,
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
 const pricingSchema = new mongoose.Schema(
   {
     isActive: {
@@ -11,56 +51,148 @@ const pricingSchema = new mongoose.Schema(
     // ==============================
     // Driver Only
     // ==============================
-    driverBaseFare: { type: Number, required: true, min: 0, default: 300 },
-    driverHourlyRate: { type: Number, required: true, min: 0, default: 150 },
-    driverExtraHourlyRate: {
-      type: Number,
-      required: true,
-      min: 0,
-      default: 120,
-    },
-    driverMinimumHours: {
-      type: Number,
-      required: true,
-      min: 1,
-      default: 4,
+    driverOnly: {
+      baseFare: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 300,
+      },
+      hourlyRate: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 150,
+      },
+      extraHourlyRate: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 120,
+      },
+      minimumHours: {
+        type: Number,
+        required: true,
+        min: 1,
+        default: 4,
+      },
     },
 
     // ==============================
     // Car + Driver
     // ==============================
-    carDriverBaseFare: { type: Number, required: true, min: 0, default: 250 },
-    acRatePerKm: { type: Number, required: true, min: 0, default: 21 },
-    nonAcRatePerKm: { type: Number, required: true, min: 0, default: 18 },
-    minimumKm: { type: Number, required: true, min: 1, default: 1 },
-    extraKmCharge: { type: Number, required: true, min: 0, default: 0 },
+    carWithDriver: {
+      local: {
+        mini: {
+          type: vehicleCategoryPricingSchema,
+          required: true,
+        },
+        sedan: {
+          type: vehicleCategoryPricingSchema,
+          required: true,
+        },
+        xl7Seater: {
+          type: vehicleCategoryPricingSchema,
+          required: true,
+        },
+        forceTraveller: {
+          type: vehicleCategoryPricingSchema,
+          required: true,
+        },
+      },
 
-    // Retained as configurable rates for the existing admin pricing screen.
-    // They are not applied until the booking flow supports Local/Outstation trips.
-    driverAllowance: { type: Number, required: true, min: 0, default: 0 },
-    nightStay: { type: Number, required: true, min: 0, default: 0 },
-    tollCharge: { type: Number, required: true, min: 0, default: 0 },
-    stateTax: { type: Number, required: true, min: 0, default: 0 },
-    localBaseFare: { type: Number, required: true, min: 0, default: 0 },
-    localPerKmRate: { type: Number, required: true, min: 0, default: 0 },
+      outstation: {
+        mini: {
+          type: vehicleCategoryPricingSchema,
+          required: true,
+        },
+        sedan: {
+          type: vehicleCategoryPricingSchema,
+          required: true,
+        },
+        xl7Seater: {
+          type: vehicleCategoryPricingSchema,
+          required: true,
+        },
+        forceTraveller: {
+          type: vehicleCategoryPricingSchema,
+          required: true,
+        },
+      },
+    },
 
     // ==============================
-    // Common
+    // Outstation Charges
     // ==============================
-    waitingChargePerMinute: { type: Number, required: true, min: 0, default: 2 },
-    waitingGraceTimeMinutes: { type: Number, required: true, min: 0, default: 15 },
+    outstationCharges: {
+      driverAllowance: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0,
+      },
+      nightStay: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 0,
+      },
+    },
 
-    airportCharge: { type: Number, required: true, min: 0, default: 200 },
-    gstPercent: { type: Number, required: true, min: 0, default: 5 },
-    nightChargePercent: { type: Number, required: true, min: 0, default: 10 },
-    weekendChargePercent: { type: Number, required: true, min: 0, default: 5 },
-
-    minimumFare: { type: Number, required: true, min: 0, default: 300 },
-
-    // For future extensibility
-    nightChargeWindow: {
-      startHour: { type: Number, min: 0, max: 23, default: 22 },
-      endHour: { type: Number, min: 0, max: 23, default: 5 },
+    // ==============================
+    // Common Charges
+    // ==============================
+    common: {
+      waitingChargePerMinute: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 2,
+      },
+      waitingGraceTimeMinutes: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 15,
+      },
+      gstPercent: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 5,
+      },
+      nightChargePercent: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 10,
+      },
+      weekendChargePercent: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 5,
+      },
+      minimumFare: {
+        type: Number,
+        required: true,
+        min: 0,
+        default: 300,
+      },
+      nightChargeWindow: {
+        startHour: {
+          type: Number,
+          min: 0,
+          max: 23,
+          default: 22,
+        },
+        endHour: {
+          type: Number,
+          min: 0,
+          max: 23,
+          default: 5,
+        },
+      },
     },
   },
   {
@@ -69,8 +201,7 @@ const pricingSchema = new mongoose.Schema(
   }
 );
 
-// Enforce at MongoDB level (best-effort) that there is only one active document.
-// If your MongoDB version doesn't support partial indexes, service-layer validation still enforces.
+// Enforce at MongoDB level that only one active pricing document exists.
 pricingSchema.index(
   { isActive: 1 },
   {

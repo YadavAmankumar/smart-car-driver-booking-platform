@@ -240,12 +240,24 @@ export default function DriverBookingsPage() {
                         {booking.serviceType || "-"}
                       </p>
 
-                      {booking.carType && (
+                      {booking.vehicleAc && (
                         <p className="text-xs text-slate-500">
-                          {booking.carType}
+                          {booking.vehicleAc}
                         </p>
                       )}
                     </div>
+
+                    {booking.serviceType === "Driver Only" && (
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Booked Hours
+                        </p>
+
+                        <p className="mt-1 text-sm font-medium text-slate-900">
+                          {booking.estimatedHours ?? "-"} hrs
+                        </p>
+                      </div>
+                    )}
 
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

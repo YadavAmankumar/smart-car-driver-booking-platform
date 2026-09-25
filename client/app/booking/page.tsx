@@ -1,5 +1,5 @@
-import BookingForm from "@/components/booking/BookingForm";
 import BookingAuthGuard from "@/components/booking/BookingAuthGuard";
+import ServiceSelection from "@/components/booking/ServiceSelection";
 
 export default function Page() {
   return (
@@ -10,19 +10,17 @@ export default function Page() {
             Book a Ride
           </h1>
           <p className="mt-3 text-sm text-slate-600 sm:text-base">
-            Share your pickup & vehicle preference. We’ll confirm your driver/car
-            request fast.
+            Choose the service that fits your trip.
           </p>
 
           <div className="mt-6">
-            <BookingForm />
+            <ServiceSelection />
           </div>
         </div>
       </main>
     </BookingAuthGuard>
   );
 }
-
 
 
 

@@ -70,25 +70,60 @@ const assertBookingResourcesAvailable = async (booking, { driverId, carId } = {}
 
   if (selectedDriverId) {
     const driver = await Driver.findById(selectedDriverId);
-    if (!driver) throw new BookingLifecycleError("Selected driver was not found.", 404);
-    if (driver.status !== "Available" && !sameId(booking.driver, driver._id)) {
+    if (!driver) {
+      throw new BookingLifecycleError("Selected driver was not found.", 404);
+    }
+
+    const driverHasOngoingTrip = await Booking.exists({
+      _id: { $ne: booking._id },
+      driver: driver._id,
+      bookingStatus: "Ongoing",
+    });
+
+    if (driverHasOngoingTrip) {
       throw new BookingLifecycleError("Selected driver is unavailable.");
     }
+
     await assertNoResourceConflict(booking, "driver", driver._id);
   }
 
   if (selectedCarId) {
     if (booking.serviceType !== "Car with Driver") {
-      throw new BookingLifecycleError("A car can only be assigned to a Car with Driver booking.", 400);
+      throw new BookingLifecycleError(
+        "A car can only be assigned to a Car with Driver booking.",
+        400
+      );
     }
+
     const car = await Car.findById(selectedCarId);
-    if (!car) throw new BookingLifecycleError("Selected car was not found.", 404);
-    if (!car.isAvailable && !sameId(booking.car, car._id)) {
+    if (!car) {
+      throw new BookingLifecycleError("Selected car was not found.", 404);
+    }
+
+    const carHasOngoingTrip = await Booking.exists({
+      _id: { $ne: booking._id },
+      car: car._id,
+      bookingStatus: "Ongoing",
+    });
+
+    if (carHasOngoingTrip) {
       throw new BookingLifecycleError("Selected car is unavailable.");
     }
-    if ((booking.carType === "AC") !== car.isAC) {
-      throw new BookingLifecycleError("Selected car does not match the booking's AC requirement.", 400);
+
+    if (booking.vehicleCategory !== car.vehicleCategory) {
+      throw new BookingLifecycleError(
+        "Selected car does not match the booking's vehicle category.",
+        400
+      );
     }
+
+    if ((booking.vehicleAc === "AC") !== car.isAC) {
+      throw new BookingLifecycleError(
+        "Selected car does not match the booking's AC requirement.",
+        400
+      );
+    }
+
     await assertNoResourceConflict(booking, "car", car._id);
   }
 };
@@ -122,34 +157,51 @@ const transitionBooking = (booking, nextStatus, actor, reason = "") => {
 
 const refreshResourceAvailability = async (booking) => {
   if (booking.driver) {
-    const driverHasReservation = await Booking.exists({
+    const driverHasOngoingTrip = await Booking.exists({
       _id: { $ne: booking._id },
       driver: booking.driver,
-      bookingStatus: { $in: RESERVING_STATUSES },
+      bookingStatus: "Ongoing",
     });
+
     await Driver.findByIdAndUpdate(booking.driver, {
-      status: driverHasReservation || RESERVING_STATUSES.includes(booking.bookingStatus) ? "Busy" : "Available",
+      status:
+        driverHasOngoingTrip || booking.bookingStatus === "Ongoing"
+          ? "Busy"
+          : "Available",
     });
   }
+
   if (booking.car) {
-    const carHasReservation = await Booking.exists({
+    const carHasOngoingTrip = await Booking.exists({
       _id: { $ne: booking._id },
       car: booking.car,
-      bookingStatus: { $in: RESERVING_STATUSES },
+      bookingStatus: "Ongoing",
     });
+
     await Car.findByIdAndUpdate(booking.car, {
-      isAvailable: !(carHasReservation || RESERVING_STATUSES.includes(booking.bookingStatus)),
+      isAvailable: !(
+        carHasOngoingTrip || booking.bookingStatus === "Ongoing"
+      ),
     });
   }
 };
 
 const releaseResourceIfFree = async (field, resourceId) => {
   if (!resourceId) return;
-  const hasReservation = await Booking.exists({ [field]: resourceId, bookingStatus: { $in: RESERVING_STATUSES } });
+
+  const hasOngoingTrip = await Booking.exists({
+    [field]: resourceId,
+    bookingStatus: "Ongoing",
+  });
+
   if (field === "driver") {
-    await Driver.findByIdAndUpdate(resourceId, { status: hasReservation ? "Busy" : "Available" });
+    await Driver.findByIdAndUpdate(resourceId, {
+      status: hasOngoingTrip ? "Busy" : "Available",
+    });
   } else {
-    await Car.findByIdAndUpdate(resourceId, { isAvailable: !hasReservation });
+    await Car.findByIdAndUpdate(resourceId, {
+      isAvailable: !hasOngoingTrip,
+    });
   }
 };
 

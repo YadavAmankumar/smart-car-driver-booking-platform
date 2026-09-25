@@ -255,10 +255,13 @@ export default function DriverTripsPage() {
 
                     <div>
                       <p className="text-xs font-medium text-slate-500">
-                        Car Type
+                        Vehicle Category
                       </p>
                       <p className="mt-1 text-sm text-slate-800">
-                        {booking.carType ?? "—"}
+                        {booking.vehicleCategory ?? "—"}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {booking.vehicleAc ?? "—"}
                       </p>
                     </div>
 

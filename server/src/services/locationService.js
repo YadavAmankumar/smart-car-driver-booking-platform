@@ -1,8 +1,9 @@
-const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
-const OSRM_URL = "https://router.project-osrm.org/route/v1/driving";
+const OLA_AUTOCOMPLETE_URL = "https://api.olamaps.io/places/v1/autocomplete";
+const OLA_DIRECTIONS_URL = "https://api.olamaps.io/routing/v1/directions";
 
-const requestJson = async (url) => {
+const requestJson = async (url, options = {}) => {
   const response = await fetch(url, {
+    ...options,
     headers: { "User-Agent": "SmartCarDriverBookingPlatform/1.0" },
     signal: AbortSignal.timeout(8000),
   });
@@ -11,21 +12,44 @@ const requestJson = async (url) => {
 };
 
 exports.searchLocations = async (query) => {
-  const url = new URL(NOMINATIM_URL);
-  url.search = new URLSearchParams({ q: query, format: "jsonv2", addressdetails: "1", limit: "5" }).toString();
-  const results = await requestJson(url);
-  return results.map((result) => ({
-    id: result.place_id,
-    label: result.display_name,
-    latitude: Number(result.lat),
-    longitude: Number(result.lon),
-  }));
+  if (!process.env.OLA_MAPS_API_KEY) throw new Error("Location service is not configured");
+  const url = new URL(OLA_AUTOCOMPLETE_URL);
+  url.search = new URLSearchParams({ input: query, api_key: process.env.OLA_MAPS_API_KEY }).toString();
+  const result = await requestJson(url);
+  const predictions = Array.isArray(result.predictions) ? result.predictions : [];
+  return predictions
+    .map((prediction) => ({
+      id: prediction.place_id,
+      label: prediction.description,
+      latitude: Number(prediction.geometry?.location?.lat),
+      longitude: Number(prediction.geometry?.location?.lng),
+    }))
+    .filter((location) => location.id && location.label && Number.isFinite(location.latitude) && Number.isFinite(location.longitude));
 };
 
 exports.getRoute = async ({ pickup, drop }) => {
-  const coordinates = `${pickup.longitude},${pickup.latitude};${drop.longitude},${drop.latitude}`;
-  const result = await requestJson(`${OSRM_URL}/${coordinates}?overview=false`);
+  if (!process.env.OLA_MAPS_API_KEY) {
+    throw new Error("Location service is not configured");
+  }
+
+  const url = new URL(OLA_DIRECTIONS_URL);
+
+  url.search = new URLSearchParams({
+    origin: `${pickup.latitude},${pickup.longitude}`,
+    destination: `${drop.latitude},${drop.longitude}`,
+    api_key: process.env.OLA_MAPS_API_KEY,
+  }).toString();
+
+  const result = await requestJson(url.toString(), { method: "POST" });
   const route = result.routes?.[0];
-  if (!route) throw new Error("No driving route found for these locations");
-  return { distanceKm: Math.round((route.distance / 1000) * 100) / 100, durationMinutes: Math.ceil(route.duration / 60) };
+  const leg = route?.legs?.[0];
+
+  if (!leg) {
+    throw new Error("No driving route found for these locations");
+  }
+
+  return {
+    distanceKm: Math.round((leg.distance / 1000) * 100) / 100,
+    durationMinutes: Math.ceil(leg.duration / 60),
+  };
 };

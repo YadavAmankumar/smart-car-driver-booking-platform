@@ -68,7 +68,7 @@ const paymentSchema = new mongoose.Schema(
 
     verifiedType: {
       type: String,
-      enum: ["Cash Collection", "UPI Manual Verification", "UPI Driver Confirmation", ""],
+      enum: ["Cash Collection", "UPI Driver Confirmation", ""],
       default: "",
     },
 

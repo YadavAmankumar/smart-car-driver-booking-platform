@@ -1,16 +1,28 @@
 const Pricing = require("../models/Pricing");
 
-const DEFAULT_NIGHT_WINDOW = { startHour: 22, endHour: 5 }; // 22:00–05:00
+const DEFAULT_NIGHT_WINDOW = { startHour: 22, endHour: 5 };
 
-const isValidNumber = (n) => typeof n === "number" && Number.isFinite(n);
+const VEHICLE_CATEGORIES = [
+  "Mini",
+  "Sedan",
+  "XL – 7 Seater",
+  "Force Traveller",
+];
 
-const assertNonNegative = (value, field) => {
-  if (!isValidNumber(value) || value < 0) {
-    throw new Error(`${field} must be a non-negative number`);
-  }
+const VEHICLE_CATEGORY_KEYS = {
+  Mini: "mini",
+  Sedan: "sedan",
+  "XL – 7 Seater": "xl7Seater",
+  "Force Traveller": "forceTraveller",
 };
 
-const assertNonNegativeOrZero = (value, field) => {
+const AC_TYPES = ["AC", "Non-AC"];
+const TRIP_TYPES = ["Local", "Outstation"];
+
+const isValidNumber = (value) =>
+  typeof value === "number" && Number.isFinite(value);
+
+const assertNonNegative = (value, field) => {
   if (!isValidNumber(value) || value < 0) {
     throw new Error(`${field} must be a non-negative number`);
   }
@@ -22,152 +34,256 @@ const assertPositive = (value, field) => {
   }
 };
 
-const validatePricingConfig = (p) => {
-  if (!p) throw new Error("Missing active pricing configuration");
+const validateVehiclePricing = (pricing, fieldPrefix) => {
+  if (!pricing || typeof pricing !== "object") {
+    throw new Error(`${fieldPrefix} pricing configuration is missing`);
+  }
 
-  // Driver only
-  assertNonNegative(p.driverBaseFare, "driverBaseFare");
-  assertNonNegative(p.driverHourlyRate, "driverHourlyRate");
-  assertNonNegative(p.driverExtraHourlyRate, "driverExtraHourlyRate");
-  assertPositive(p.driverMinimumHours, "driverMinimumHours");
+  assertNonNegative(pricing.baseFare, `${fieldPrefix}.baseFare`);
+  assertNonNegative(pricing.ratePerKm, `${fieldPrefix}.ratePerKm`);
+  assertPositive(pricing.minimumKm, `${fieldPrefix}.minimumKm`);
+  assertNonNegative(pricing.extraKmCharge, `${fieldPrefix}.extraKmCharge`);
+};
 
-  // Car+driver
-  assertNonNegative(p.carDriverBaseFare, "carDriverBaseFare");
-  assertNonNegative(p.acRatePerKm, "acRatePerKm");
-  assertNonNegative(p.nonAcRatePerKm, "nonAcRatePerKm");
-  assertPositive(p.minimumKm, "minimumKm");
-  assertNonNegative(p.extraKmCharge, "extraKmCharge");
+const validateVehicleCategoryPricing = (pricing, fieldPrefix) => {
+  if (!pricing || typeof pricing !== "object") {
+    throw new Error(`${fieldPrefix} pricing configuration is missing`);
+  }
 
-  assertNonNegative(p.driverAllowance, "driverAllowance");
-  assertNonNegative(p.nightStay, "nightStay");
-  assertNonNegative(p.tollCharge, "tollCharge");
-  assertNonNegative(p.stateTax, "stateTax");
-  assertNonNegative(p.localBaseFare, "localBaseFare");
-  assertNonNegative(p.localPerKmRate, "localPerKmRate");
+  validateVehiclePricing(pricing.ac, `${fieldPrefix}.ac`);
+  validateVehiclePricing(pricing.nonAc, `${fieldPrefix}.nonAc`);
+};
 
-  // Common
-  assertNonNegativeOrZero(p.waitingChargePerMinute, "waitingChargePerMinute");
-  assertNonNegativeOrZero(
-    p.waitingGraceTimeMinutes,
-    "waitingGraceTimeMinutes"
+const validateTripPricing = (pricing, tripType) => {
+  if (!pricing || typeof pricing !== "object") {
+    throw new Error(`${tripType} pricing configuration is missing`);
+  }
+
+  Object.entries(VEHICLE_CATEGORY_KEYS).forEach(
+    ([category, categoryKey]) => {
+      validateVehicleCategoryPricing(
+        pricing[categoryKey],
+        `carWithDriver.${tripType.toLowerCase()}.${category}`
+      );
+    }
   );
-  assertNonNegative(p.airportCharge, "airportCharge");
+};
 
-  assertNonNegativeOrZero(p.gstPercent, "gstPercent");
-  assertNonNegativeOrZero(p.nightChargePercent, "nightChargePercent");
-  assertNonNegativeOrZero(p.weekendChargePercent, "weekendChargePercent");
+const validatePricingConfig = (p) => {
+  if (!p) {
+    throw new Error("Missing active pricing configuration");
+  }
 
-  assertNonNegative(p.minimumFare, "minimumFare");
+  if (!p.driverOnly) {
+    throw new Error("driverOnly pricing configuration is missing");
+  }
 
-  // Night window
-  const window = p.nightChargeWindow || DEFAULT_NIGHT_WINDOW;
+  assertNonNegative(p.driverOnly.baseFare, "driverOnly.baseFare");
+  assertNonNegative(p.driverOnly.hourlyRate, "driverOnly.hourlyRate");
+  assertNonNegative(
+    p.driverOnly.extraHourlyRate,
+    "driverOnly.extraHourlyRate"
+  );
+  assertPositive(p.driverOnly.minimumHours, "driverOnly.minimumHours");
+
+  if (!p.carWithDriver) {
+    throw new Error("carWithDriver pricing configuration is missing");
+  }
+
+  validateTripPricing(p.carWithDriver.local, "Local");
+  validateTripPricing(p.carWithDriver.outstation, "Outstation");
+
+  if (!p.outstationCharges) {
+    throw new Error("outstationCharges configuration is missing");
+  }
+
+  assertNonNegative(
+    p.outstationCharges.driverAllowance,
+    "outstationCharges.driverAllowance"
+  );
+  assertNonNegative(
+    p.outstationCharges.nightStay,
+    "outstationCharges.nightStay"
+  );
+
+  if (!p.common) {
+    throw new Error("common pricing configuration is missing");
+  }
+
+  assertNonNegative(
+    p.common.waitingChargePerMinute,
+    "common.waitingChargePerMinute"
+  );
+  assertNonNegative(
+    p.common.waitingGraceTimeMinutes,
+    "common.waitingGraceTimeMinutes"
+  );
+  assertNonNegative(p.common.gstPercent, "common.gstPercent");
+  assertNonNegative(
+    p.common.nightChargePercent,
+    "common.nightChargePercent"
+  );
+  assertNonNegative(
+    p.common.weekendChargePercent,
+    "common.weekendChargePercent"
+  );
+  assertNonNegative(p.common.minimumFare, "common.minimumFare");
+
+  const window = p.common.nightChargeWindow || DEFAULT_NIGHT_WINDOW;
+
   if (!isValidNumber(window.startHour) || !isValidNumber(window.endHour)) {
-    throw new Error("nightChargeWindow must contain valid startHour and endHour");
+    throw new Error(
+      "common.nightChargeWindow must contain valid startHour and endHour"
+    );
   }
+
   if (window.startHour < 0 || window.startHour > 23) {
-    throw new Error("nightChargeWindow.startHour must be between 0 and 23");
+    throw new Error(
+      "common.nightChargeWindow.startHour must be between 0 and 23"
+    );
   }
+
   if (window.endHour < 0 || window.endHour > 23) {
-    throw new Error("nightChargeWindow.endHour must be between 0 and 23");
+    throw new Error(
+      "common.nightChargeWindow.endHour must be between 0 and 23"
+    );
   }
 };
 
-const isNightTime = ({ pickupDate, pickupTime, nightChargeWindow }) => {
-  if (!pickupDate || !pickupTime) return false;
+const isNightTime = ({ pickupTime, nightChargeWindow }) => {
+  if (!pickupTime) return false;
 
-  const { startHour, endHour } = nightChargeWindow || DEFAULT_NIGHT_WINDOW;
+  const { startHour, endHour } =
+    nightChargeWindow || DEFAULT_NIGHT_WINDOW;
 
   const timeStr = String(pickupTime).trim();
-  // Expect format like HH:mm or HH:mm:ss
   const [hhStr, mmStr] = timeStr.split(":");
+
   const hour = Number(hhStr);
   const minute = Number(mmStr);
 
-  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return false;
+  if (
+    !Number.isFinite(hour) ||
+    !Number.isFinite(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
+  ) {
+    return false;
+  }
 
-  // Handles cross-midnight: 22 -> 5
   if (startHour === endHour) {
     return hour === startHour;
   }
 
   if (startHour < endHour) {
-    // Same-day window
     return hour >= startHour && hour < endHour;
   }
 
-  // Cross-midnight window
   return hour >= startHour || hour < endHour;
 };
 
 const isWeekend = ({ pickupDate }) => {
   if (!pickupDate) return false;
-  const d = pickupDate instanceof Date ? pickupDate : new Date(pickupDate);
-  if (Number.isNaN(d.getTime())) return false;
-  const day = d.getDay();
-  // 0 = Sunday, 6 = Saturday
+
+  const date =
+    pickupDate instanceof Date ? pickupDate : new Date(pickupDate);
+
+  if (Number.isNaN(date.getTime())) return false;
+
+  const day = date.getDay();
+
   return day === 0 || day === 6;
 };
 
-const calculateWaitingChargeMinutes = ({ waitingMinutes, graceMinutes }) => {
-  if (!isValidNumber(waitingMinutes) || waitingMinutes <= 0) return 0;
+const calculateWaitingChargeMinutes = ({
+  waitingMinutes,
+  graceMinutes,
+}) => {
+  if (!isValidNumber(waitingMinutes) || waitingMinutes <= 0) {
+    return 0;
+  }
+
   if (!isValidNumber(graceMinutes) || graceMinutes <= 0) {
-    // If grace time is invalid/zero, charge from minute 1
     return waitingMinutes;
   }
-  const chargeable = Math.max(0, waitingMinutes - graceMinutes);
-  return chargeable;
+
+  return Math.max(0, waitingMinutes - graceMinutes);
 };
 
-/**
- * Booking supports future distance/duration integration:
- * - Provide distance/duration later without changing Pricing Engine signature too much.
- * - For now, booking inputs are estimatedHours/estimatedKm.
- */
+const getVehiclePricing = ({
+  pricing,
+  tripType,
+  vehicleCategory,
+  vehicleAc,
+}) => {
+  if (!TRIP_TYPES.includes(tripType)) {
+    throw new Error("tripType must be 'Local' or 'Outstation'");
+  }
+
+  if (!VEHICLE_CATEGORIES.includes(vehicleCategory)) {
+    throw new Error(
+      "vehicleCategory must be 'Mini', 'Sedan', 'XL – 7 Seater', or 'Force Traveller'"
+    );
+  }
+
+  if (!AC_TYPES.includes(vehicleAc)) {
+    throw new Error("vehicleAc must be 'AC' or 'Non-AC'");
+  }
+
+  const tripKey = tripType.toLowerCase();
+  const categoryKey = VEHICLE_CATEGORY_KEYS[vehicleCategory];
+  const acKey = vehicleAc === "AC" ? "ac" : "nonAc";
+
+  const selectedPricing =
+    pricing.carWithDriver?.[tripKey]?.[categoryKey]?.[acKey];
+
+  if (!selectedPricing) {
+    throw new Error(
+      `Pricing configuration not found for ${tripType} / ${vehicleCategory} / ${vehicleAc}`
+    );
+  }
+
+  return selectedPricing;
+};
+
 const calculateFare = async ({
   serviceType,
-  carType,
+  tripType,
+  vehicleCategory,
+  vehicleAc,
   estimatedHours,
   estimatedKm,
   pickupDate,
   pickupTime,
-  isAirportRide,
   waitingMinutes = 0,
 }) => {
   const pricing = await getActivePricing();
+
   validatePricingConfig(pricing);
 
-  // Snapshot values
-  const snapshot = {
-    driverBaseFare: pricing.driverBaseFare,
-    driverHourlyRate: pricing.driverHourlyRate,
-    driverExtraHourlyRate: pricing.driverExtraHourlyRate,
-    driverMinimumHours: pricing.driverMinimumHours,
-    carDriverBaseFare: pricing.carDriverBaseFare,
-    acRatePerKm: pricing.acRatePerKm,
-    nonAcRatePerKm: pricing.nonAcRatePerKm,
-    minimumKm: pricing.minimumKm,
-    extraKmCharge: pricing.extraKmCharge,
-    driverAllowance: pricing.driverAllowance,
-    nightStay: pricing.nightStay,
-    tollCharge: pricing.tollCharge,
-    stateTax: pricing.stateTax,
-    localBaseFare: pricing.localBaseFare,
-    localPerKmRate: pricing.localPerKmRate,
-    waitingChargePerMinute: pricing.waitingChargePerMinute,
-    waitingGraceTimeMinutes: pricing.waitingGraceTimeMinutes,
-    airportCharge: pricing.airportCharge,
-    gstPercent: pricing.gstPercent,
-    nightChargePercent: pricing.nightChargePercent,
-    weekendChargePercent: pricing.weekendChargePercent,
-    minimumFare: pricing.minimumFare,
-    nightChargeWindow: pricing.nightChargeWindow || DEFAULT_NIGHT_WINDOW,
-  };
+  const common = pricing.common;
 
-  const nightChargeWindow = snapshot.nightChargeWindow || DEFAULT_NIGHT_WINDOW;
+  let selectedVehiclePricing = null;
 
-  const weekendEligible = isWeekend({ pickupDate });
-  const nightEligible = isNightTime({
+  if (serviceType === "Car with Driver") {
+    selectedVehiclePricing = getVehiclePricing({
+      pricing,
+      tripType,
+      vehicleCategory,
+      vehicleAc,
+    });
+  }
+
+  const nightChargeWindow =
+    common.nightChargeWindow || DEFAULT_NIGHT_WINDOW;
+
+  const weekendEligible = isWeekend({
     pickupDate,
+  });
+
+  const nightEligible = isNightTime({
     pickupTime,
     nightChargeWindow,
   });
@@ -176,108 +292,165 @@ const calculateFare = async ({
   let distanceCharge = 0;
   let hourlyRate = 0;
   let ratePerKm = 0;
-
-  let estimatedDuration = 0; // in hours
+  let estimatedDuration = 0;
   let distanceKm = 0;
 
-  // ==============================
-  // Base + distance
-  // ==============================
+  let outstationDriverAllowance = 0;
+  let outstationNightStay = 0;
+
   if (serviceType === "Driver Only") {
     if (!isValidNumber(estimatedHours) || estimatedHours < 1) {
-      throw new Error("estimatedHours must be a number >= 1 for Driver Only");
+      throw new Error(
+        "estimatedHours must be a number >= 1 for Driver Only"
+      );
     }
 
-    estimatedDuration = estimatedHours;
+    const driverOnly = pricing.driverOnly;
+    hourlyRate = driverOnly.hourlyRate;
 
-    baseFare = snapshot.driverBaseFare;
-    hourlyRate = snapshot.driverHourlyRate;
+    // The customer books an explicit number of Driver Only hours. Legacy
+    // configuration remains snapshotted for compatibility, but does not alter
+    // the new booking estimate.
+    baseFare = estimatedHours * hourlyRate;
 
-    // Minimum hours are bundled with hourly rate.
-    // Extra hours charged with extra rate beyond minimum.
-    const minimumHours = snapshot.driverMinimumHours;
-    const regularHoursCharged = Math.min(estimatedHours, minimumHours);
-    const extraHoursCharged = Math.max(0, estimatedHours - minimumHours);
+    const round = (value) => Math.round((value || 0) * 100) / 100;
 
-    const regularCharge = regularHoursCharged * snapshot.driverHourlyRate;
-    const extraCharge = extraHoursCharged * snapshot.driverExtraHourlyRate;
-
-    baseFare = baseFare + regularCharge + extraCharge;
+    return {
+      pricingSnapshot: {
+        driverOnly: pricing.driverOnly,
+        common,
+      },
+      baseFare: round(baseFare),
+      distanceKm: 0,
+      estimatedDuration: 0,
+      ratePerKm: 0,
+      hourlyRate: round(hourlyRate),
+      distanceCharge: 0,
+      waitingCharge: 0,
+      outstationDriverAllowance: 0,
+      outstationNightStay: 0,
+      outstationCharge: 0,
+      airportCharge: 0,
+      nightCharge: 0,
+      weekendCharge: 0,
+      gst: 0,
+      minimumFare: 0,
+      estimatedFare: round(baseFare),
+    };
   } else if (serviceType === "Car with Driver") {
-    if (!isValidNumber(estimatedKm) || estimatedKm < 1) {
-      throw new Error("estimatedKm must be a number >= 1 for Car with Driver");
+    if (!TRIP_TYPES.includes(tripType)) {
+      throw new Error(
+        "tripType must be 'Local' or 'Outstation' for Car with Driver"
+      );
     }
-    if (!carType || !["AC", "Non-AC"].includes(carType)) {
-      throw new Error("carType must be 'AC' or 'Non-AC' for Car with Driver");
+
+    if (!VEHICLE_CATEGORIES.includes(vehicleCategory)) {
+      throw new Error("Valid vehicleCategory is required for Car with Driver");
+    }
+
+    if (!AC_TYPES.includes(vehicleAc)) {
+      throw new Error("Valid vehicleAc is required for Car with Driver");
+    }
+
+    if (!isValidNumber(estimatedKm) || estimatedKm < 1) {
+      throw new Error(
+        "estimatedKm must be a number >= 1 for Car with Driver"
+      );
     }
 
     distanceKm = estimatedKm;
 
-    baseFare = snapshot.carDriverBaseFare;
+    baseFare = selectedVehiclePricing.baseFare;
+    ratePerKm = selectedVehiclePricing.ratePerKm;
 
-    if (carType === "AC") {
-      ratePerKm = snapshot.acRatePerKm;
-    } else {
-      ratePerKm = snapshot.nonAcRatePerKm;
+    const minimumKm = selectedVehiclePricing.minimumKm;
+    const chargedKm = Math.max(distanceKm, minimumKm);
+
+    const includedKm = Math.min(chargedKm, minimumKm);
+    const extraKm = Math.max(0, chargedKm - minimumKm);
+
+    distanceCharge =
+      includedKm * ratePerKm +
+      extraKm * (ratePerKm + selectedVehiclePricing.extraKmCharge);
+
+    if (tripType === "Outstation") {
+      outstationDriverAllowance =
+        pricing.outstationCharges.driverAllowance;
+
+      outstationNightStay =
+        pricing.outstationCharges.nightStay;
     }
 
-    const includedKm = snapshot.minimumKm;
-    const chargedKm = Math.max(distanceKm, includedKm);
-    const standardKm = Math.min(chargedKm, includedKm);
-    const extraKm = Math.max(0, chargedKm - includedKm);
-    distanceCharge =
-      standardKm * ratePerKm + extraKm * (ratePerKm + snapshot.extraKmCharge);
-
-    // For now, estimatedDuration isn't derived from km (no duration model provided).
-    // Leave as 0 to be compatible with future Google Directions integration.
     estimatedDuration = 0;
   } else {
     throw new Error("Invalid serviceType");
   }
 
-  // ==============================
-  // Waiting (future workflow; always 0 at booking creation)
-  // ==============================
   const waitingChargeableMinutes =
     calculateWaitingChargeMinutes({
       waitingMinutes,
-      graceMinutes: snapshot.waitingGraceTimeMinutes,
+      graceMinutes: common.waitingGraceTimeMinutes,
     });
 
-  const waitingCharge = waitingChargeableMinutes * snapshot.waitingChargePerMinute;
+  const waitingCharge =
+    waitingChargeableMinutes * common.waitingChargePerMinute;
 
-  // Airport: must be based on dedicated boolean field (no address searching)
-  const airportCharge = isAirportRide ? snapshot.airportCharge : 0;
+  const outstationCharge =
+    serviceType === "Car with Driver" && tripType === "Outstation"
+      ? outstationDriverAllowance + outstationNightStay
+      : 0;
 
-  // Night / weekend charges are percent surcharges on subtotal BEFORE GST.
-  const subtotalBeforeGST =
-    baseFare + distanceCharge + waitingCharge + airportCharge;
+  const subtotalBeforeSurcharges =
+    baseFare +
+    distanceCharge +
+    waitingCharge +
+    outstationCharge;
 
   const nightCharge = nightEligible
-    ? (subtotalBeforeGST * snapshot.nightChargePercent) / 100
+    ? (subtotalBeforeSurcharges * common.nightChargePercent) / 100
     : 0;
 
   const weekendCharge = weekendEligible
-    ? (subtotalBeforeGST * snapshot.weekendChargePercent) / 100
+    ? (subtotalBeforeSurcharges * common.weekendChargePercent) / 100
     : 0;
 
-  const subtotalAfterSurcharges = subtotalBeforeGST + nightCharge + weekendCharge;
+  const subtotalAfterSurcharges =
+    subtotalBeforeSurcharges +
+    nightCharge +
+    weekendCharge;
 
-  const gst = (subtotalAfterSurcharges * snapshot.gstPercent) / 100;
+  const gst =
+    (subtotalAfterSurcharges * common.gstPercent) / 100;
 
   let estimatedFare = subtotalAfterSurcharges + gst;
 
-  // Enforce minimum fare (after GST)
-  if (estimatedFare < snapshot.minimumFare) {
-    estimatedFare = snapshot.minimumFare;
+  if (estimatedFare < common.minimumFare) {
+    estimatedFare = common.minimumFare;
   }
 
-  // Ensure rounding to paise-safe integer (project currently stores Numbers).
-  // We'll round to nearest integer rupee to match existing totalAmount expectations.
-  const round = (n) => Math.round((n || 0) * 100) / 100;
+  const round = (value) =>
+    Math.round((value || 0) * 100) / 100;
+
+  const pricingSnapshot = {
+    driverOnly: pricing.driverOnly,
+    carWithDriver:
+      serviceType === "Car with Driver"
+        ? {
+            tripType,
+            vehicleCategory,
+            vehicleAc,
+            pricing: selectedVehiclePricing,
+          }
+        : undefined,
+    outstationCharges:
+      serviceType === "Car with Driver" && tripType === "Outstation"
+        ? pricing.outstationCharges
+        : undefined,
+    common,
+  };
 
   return {
-    pricingSnapshot: snapshot,
+    pricingSnapshot,
 
     baseFare: round(baseFare),
     distanceKm: round(distanceKm),
@@ -288,31 +461,38 @@ const calculateFare = async ({
 
     distanceCharge: round(distanceCharge),
     waitingCharge: round(waitingCharge),
-    airportCharge: round(airportCharge),
+
+    outstationDriverAllowance: round(outstationDriverAllowance),
+    outstationNightStay: round(outstationNightStay),
+    outstationCharge: round(outstationCharge),
+
+    airportCharge: 0,
     nightCharge: round(nightCharge),
     weekendCharge: round(weekendCharge),
     gst: round(gst),
-    minimumFare: round(snapshot.minimumFare),
+    minimumFare: round(common.minimumFare),
 
     estimatedFare: round(estimatedFare),
   };
 };
 
 const getActivePricing = async () => {
-  const active = await Pricing.find({ isActive: true }).sort({ createdAt: -1 });
+  const active = await Pricing.find({ isActive: true }).sort({
+    createdAt: -1,
+  });
 
   if (!active || active.length === 0) {
     throw new Error("No active pricing configuration found");
   }
 
   if (active.length > 1) {
-    // Service-layer enforcement (in case partial indexes are not supported).
-    // Keep the newest active; deactivate the rest.
     const [keep, ...rest] = active;
+
     await Pricing.updateMany(
-      { _id: { $in: rest.map((d) => d._id) } },
+      { _id: { $in: rest.map((pricing) => pricing._id) } },
       { $set: { isActive: false } }
     );
+
     return keep;
   }
 
@@ -320,7 +500,7 @@ const getActivePricing = async () => {
 };
 
 module.exports = {
-  getActivePricing,
   validatePricingConfig,
   calculateFare,
+  getActivePricing,
 };

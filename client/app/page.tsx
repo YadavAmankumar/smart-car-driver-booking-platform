@@ -1,6 +1,6 @@
 import Footer from "@/components/layout/Footer";
 import Navbar from "@/components/layout/Navbar";
-import Fleet from "@/components/home/Fleet";
+import Car from "@/components/home/Car";
 import Hero from "@/components/home/Hero";
 import HowItWorks from "@/components/home/HowItWorks";
 import Services from "@/components/home/Services";
@@ -12,7 +12,7 @@ export default function Home() {
       <Navbar />
       <Hero />
       <Services />
-      <Fleet />
+      <Car />
       <HowItWorks />
       <Testimonials />
       <Footer />

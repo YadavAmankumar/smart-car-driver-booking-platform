@@ -12,6 +12,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
       {children}
       <Toaster
         position="top-right"
+        containerStyle={{
+          zIndex: 9999,
+        }}
         toastOptions={{
           duration: 3200,
           style: {

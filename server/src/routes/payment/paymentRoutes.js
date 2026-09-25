@@ -7,8 +7,6 @@ const {
   getDriverPayments,
   markCashCollected,
   confirmDriverOnlinePayment,
-  customerMarkUpiPaid,
-  verifyUpiPayment,
   refundPayment,
   getPaymentConfig,
   getCustomerPayments,
@@ -55,13 +53,6 @@ router.put(
 // ===============================
 // Customer routes
 // ===============================
-router.post(
-  "/customer/:bookingId/upi-paid",
-  authMiddleware,
-  authorizeRoles("customer"),
-  customerMarkUpiPaid
-);
-
 router.get(
   "/customer",
   authMiddleware,
@@ -79,13 +70,6 @@ router.get(
 // ===============================
 // Admin routes
 // ===============================
-router.post(
-  "/admin/:id/verify-upi",
-  authMiddleware,
-  authorizeRoles("admin"),
-  verifyUpiPayment
-);
-
 router.post(
   "/admin/:id/refund",
   authMiddleware,

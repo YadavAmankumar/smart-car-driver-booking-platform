@@ -378,7 +378,7 @@ export default function BookingDetailsPage() {
                         </div>
                       ) : (
                         <p className="text-xs text-slate-600">
-                          Scan the QR code using any UPI app, complete the payment, then inform the assigned driver that you have paid.
+                          Please ask your assigned driver for the Business UPI QR or UPI ID. After payment, show the confirmation to your driver for verification. Your trip can be completed only after payment is verified. Thank you!
                         </p>
                       )}
                     </div>

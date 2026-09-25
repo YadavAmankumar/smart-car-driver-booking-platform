@@ -60,8 +60,12 @@ exports.createBooking = asyncHandler(async (req, res) => {
   const {
     customerName,
     mobileNumber,
+    email,
     serviceType,
-    carType,
+    tripType,
+    vehicleCategory,
+    vehicleAc,
+    travellerCount,
     pickupLocation,
     dropLocation,
     bookingDate,
@@ -70,20 +74,21 @@ exports.createBooking = asyncHandler(async (req, res) => {
     estimatedKm,
     paymentMethod,
     notes,
-
-    // Must be provided by frontend for reliable airport charge.
-    // Default to false for backward compatibility.
-    isAirportRide,
   } = req.body;
 
   const fareResult = await pricingService.calculateFare({
     serviceType,
-    carType,
-    estimatedHours: serviceType === "Driver Only" ? estimatedHours : undefined,
-    estimatedKm: serviceType === "Car with Driver" ? estimatedKm : undefined,
+    tripType: serviceType === "Car with Driver" ? tripType : undefined,
+    vehicleCategory:
+      serviceType === "Car with Driver" ? vehicleCategory : undefined,
+    vehicleAc:
+      serviceType === "Car with Driver" ? vehicleAc : undefined,
+    estimatedHours:
+      serviceType === "Driver Only" ? estimatedHours : undefined,
+    estimatedKm:
+      serviceType === "Car with Driver" ? estimatedKm : undefined,
     pickupDate: bookingDate,
     pickupTime,
-    isAirportRide: Boolean(isAirportRide),
     waitingMinutes: 0, // always 0 at booking creation
   });
 
@@ -153,8 +158,9 @@ exports.createBooking = asyncHandler(async (req, res) => {
 
       [booking] = await Booking.create([{
         bookingNumber,
-        customerName, mobileNumber, customer: req.user._id,
-        serviceType, carType, pickupLocation, dropLocation, bookingDate,
+        customerName, mobileNumber, email, customer: req.user._id,
+        serviceType, tripType, vehicleCategory, vehicleAc, travellerCount,
+        pickupLocation, dropLocation, bookingDate,
         pickupTime, estimatedHours, estimatedKm, paymentMethod, notes,
         pricingSnapshot: fareResult.pricingSnapshot,
         statusHistory: [{ to: "Pending", changedBy: req.user._id, reason: "Booking created" }],

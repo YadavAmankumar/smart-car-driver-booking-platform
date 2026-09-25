@@ -298,7 +298,10 @@ export default function DriverCarPage() {
               Car Requirement
             </p>
             <p className="mt-1 text-sm text-slate-900">
-              {activeCarBooking.carType || "-"}
+              {activeCarBooking.vehicleCategory || "-"}
+            </p>
+            <p className="text-xs text-slate-500">
+              {activeCarBooking.vehicleAc || "-"}
             </p>
           </div>
         </CardContent>

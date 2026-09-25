@@ -33,8 +33,6 @@ type BookingStatus =
   | "Completed"
   | "Cancelled";
 
-type CarType = "AC" | "Non-AC";
-
 type DriverRef = {
   _id?: string;
   id?: string;
@@ -51,7 +49,7 @@ type CarRef = {
   carNumber?: string;
   isAvailable?: boolean;
   isAC?: boolean;
-  carType?: CarType;
+  vehicleCategory?: "Mini" | "Sedan" | "XL – 7 Seater" | "Force Traveller";
   fuelType?: string;
 };
 
@@ -60,11 +58,15 @@ type BookingRow = {
   customerName?: string;
   mobileNumber?: string;
   serviceType?: string;
-  carType?: CarType;
+  tripType?: "Local" | "Outstation";
+  vehicleCategory?: "Mini" | "Sedan" | "XL – 7 Seater" | "Force Traveller";
+  vehicleAc?: "AC" | "Non-AC";
+  travellerCount?: number;
   pickupLocation?: string;
   dropLocation?: string;
   bookingDate?: string;
   pickupTime?: string;
+  estimatedHours?: number;
   paymentMethod?: string;
   bookingStatus?: BookingStatus | string;
   createdAt?: string;
@@ -475,6 +477,10 @@ export default function AdminBookingsPage() {
                   </th>
 
                   <th className="px-4 py-3">
+                    Booked Hours
+                  </th>
+
+                  <th className="px-4 py-3">
                     Pickup
                   </th>
 
@@ -634,11 +640,22 @@ export default function AdminBookingsPage() {
 
                           {service ===
                             "Car with Driver" &&
-                          b.carType ? (
+                          (b.vehicleCategory ||
+                            b.vehicleAc) ? (
                             <div className="mt-1 text-xs font-semibold text-slate-500">
-                              {b.carType}
+                              {b.vehicleCategory ??
+                                "Vehicle"}
+                              {b.vehicleAc
+                                ? ` • ${b.vehicleAc}`
+                                : ""}
                             </div>
                           ) : null}
+                        </td>
+
+                        <td className="px-4 py-3 text-slate-600">
+                          {service === "Driver Only"
+                            ? `${b.estimatedHours ?? "—"} hrs`
+                            : "—"}
                         </td>
 
                         <td className="max-w-48 px-4 py-3 text-slate-600">
@@ -850,14 +867,37 @@ export default function AdminBookingsPage() {
               />
 
               {viewBooking.serviceType ===
-                "Car with Driver" ? (
+                "Driver Only" ? (
                 <Detail
-                  label="Car Type"
+                  label="Booked Hours"
                   value={
-                    viewBooking.carType ??
-                    "—"
+                    viewBooking.estimatedHours !==
+                    undefined
+                      ? `${viewBooking.estimatedHours} hrs`
+                      : "—"
                   }
                 />
+              ) : null}
+
+              {viewBooking.serviceType ===
+                "Car with Driver" ? (
+                <>
+                  <Detail
+                    label="Vehicle Category"
+                    value={
+                      viewBooking.vehicleCategory ??
+                      "—"
+                    }
+                  />
+
+                  <Detail
+                    label="AC / Non-AC"
+                    value={
+                      viewBooking.vehicleAc ??
+                      "—"
+                    }
+                  />
+                </>
               ) : null}
 
               <Detail
@@ -1336,8 +1376,11 @@ function AssignTripDialog({
     booking?.serviceType ===
     "Car with Driver";
 
-  const requestedCarType =
-    booking?.carType;
+  const requestedVehicleCategory =
+    booking?.vehicleCategory;
+
+  const requestedVehicleAc =
+    booking?.vehicleAc;
 
   useEffect(() => {
     if (!open || !booking) return;
@@ -1372,16 +1415,7 @@ function AssignTripDialog({
 
         if (!mounted) return;
 
-        const availableDrivers =
-          allDrivers.filter(
-            (driver) =>
-              driver.status ===
-              "Available",
-          );
-
-        setDrivers(
-          availableDrivers,
-        );
+        setDrivers(allDrivers);
 
         if (isCarWithDriver) {
           const allCars = Array.isArray(
@@ -1390,16 +1424,7 @@ function AssignTripDialog({
             ? carResponse.data
             : [];
 
-          const availableCars =
-            allCars.filter(
-              (car) =>
-                car?.isAvailable ===
-                true,
-            );
-
-          setCars(
-            availableCars as CarRef[],
-          );
+          setCars(allCars as CarRef[]);
         } else {
           setCars([]);
         }
@@ -1472,7 +1497,7 @@ function AssignTripDialog({
 
   /*
    * Filter cars according to customer's
-   * AC / Non-AC requirement.
+   * vehicle category and AC / Non-AC requirement.
    *
    * Backend remains the final authority.
    */
@@ -1481,46 +1506,41 @@ function AssignTripDialog({
       return [];
     }
 
-    if (!requestedCarType) {
-      return cars;
-    }
-
     return cars.filter((car) => {
-      /*
-       * New car records may expose isAC.
-       */
       if (
-        typeof car.isAC ===
-        "boolean"
+        requestedVehicleCategory &&
+        car.vehicleCategory !== requestedVehicleCategory
       ) {
-        return requestedCarType ===
-          "AC"
-          ? car.isAC === true
-          : car.isAC === false;
+        return false;
       }
 
-      /*
-       * Some responses may expose
-       * carType directly.
-       */
-      if (car.carType) {
-        return (
-          car.carType ===
-          requestedCarType
-        );
+      if (requestedVehicleAc) {
+        if (typeof car.isAC !== "boolean") {
+          return false;
+        }
+
+        if (
+          requestedVehicleAc === "AC" &&
+          car.isAC !== true
+        ) {
+          return false;
+        }
+
+        if (
+          requestedVehicleAc === "Non-AC" &&
+          car.isAC !== false
+        ) {
+          return false;
+        }
       }
 
-      /*
-       * If the API doesn't expose the
-       * vehicle type, don't incorrectly
-       * claim compatibility.
-       */
-      return false;
+      return true;
     });
   }, [
     cars,
     isCarWithDriver,
-    requestedCarType,
+    requestedVehicleCategory,
+    requestedVehicleAc,
   ]);
 
   const selectedDriver =
@@ -1605,11 +1625,26 @@ function AssignTripDialog({
 
       onAssigned();
     } catch (e) {
-      toast.error(
-        getAxiosErrorMessage(
-          e as AxiosError,
-        ),
-      );
+      const message = getAxiosErrorMessage(e as AxiosError);
+
+      if (
+        message.toLowerCase().includes("already reserved") ||
+        message.toLowerCase().includes("overlapping booking")
+      ) {
+        const bookingDate = booking.bookingDate
+          ? new Date(booking.bookingDate).toLocaleDateString("en-IN", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })
+          : "this date";
+
+        setError(
+          `Selected driver/car is already assigned on ${bookingDate}. Please choose another driver or car.`,
+        );
+      } else {
+        setError(message);
+      }
     } finally {
       setAssigning(false);
     }
@@ -1659,9 +1694,16 @@ function AssignTripDialog({
             </Badge>
 
             {isCarWithDriver &&
-            requestedCarType ? (
+            requestedVehicleCategory ? (
               <Badge tone="blue">
-                {requestedCarType}
+                {requestedVehicleCategory}
+              </Badge>
+            ) : null}
+
+            {isCarWithDriver &&
+            requestedVehicleAc ? (
+              <Badge tone="blue">
+                {requestedVehicleAc}
               </Badge>
             ) : null}
           </div>
@@ -1671,7 +1713,7 @@ function AssignTripDialog({
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3">
             <p className="text-sm font-semibold text-red-800">
-              Could not load resources
+              Assignment Failed
             </p>
 
             <p className="mt-1 text-xs text-red-700">
@@ -1768,9 +1810,15 @@ function AssignTripDialog({
                 Car
               </label>
 
-              {requestedCarType ? (
+              {requestedVehicleCategory ? (
                 <Badge tone="blue">
-                  {requestedCarType}
+                  {requestedVehicleCategory}
+                </Badge>
+              ) : null}
+
+              {requestedVehicleAc ? (
+                <Badge tone="blue">
+                  {requestedVehicleAc}
                 </Badge>
               ) : null}
             </div>
@@ -1821,21 +1869,23 @@ function AssignTripDialog({
               )}
             </Select>
 
-            {requestedCarType ? (
+            {requestedVehicleCategory ||
+            requestedVehicleAc ? (
               <p className="mt-1.5 text-xs text-slate-500">
                 Showing available{" "}
-                {requestedCarType} cars
-                only.
+                {requestedVehicleCategory ??
+                  "matching category"}{" "}
+                {requestedVehicleAc
+                  ? `• ${requestedVehicleAc}`
+                  : ""}{" "}
+                cars only.
               </p>
             ) : null}
 
             {!loadingCars &&
             !compatibleCars.length ? (
               <p className="mt-1.5 text-xs font-medium text-red-600">
-                No available{" "}
-                {requestedCarType ??
-                  ""}{" "}
-                cars found.
+                No available matching cars found.
               </p>
             ) : null}
 

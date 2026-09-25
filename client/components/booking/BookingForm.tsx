@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createBooking,
@@ -23,9 +24,15 @@ import {
   Textarea,
 } from "@/components/ui/primitives";
 import { LoadingSpinner, Skeleton } from "@/components/ui/primitives";
+import { extractPincode, isLocalPincode } from "@/lib/serviceAreas";
 
 type ServiceType = "Driver Only" | "Car with Driver";
-type CarType = "AC" | "Non-AC";
+type VehicleAc = "AC" | "Non-AC";
+type VehicleCategory =
+  | "Mini"
+  | "Sedan"
+  | "XL – 7 Seater"
+  | "Force Traveller";
 
 type BookingFormValues = {
   customerName: string;
@@ -36,17 +43,12 @@ type BookingFormValues = {
   dropLocation: string;
   pickupDate: string; // YYYY-MM-DD
   pickupTime: string;
-  vehicleType: CarType; // UI label (AC/Non-AC)
-
-  // Driver Only: Estimated Hours (kept in this field name to avoid changing
-  // payload mapping / backend request shape).
-  numberOfPassengers: number;
-  specialInstructions: string;
-
-  carType?: CarType;
-  estimatedHours?: number;
+  vehicleAc: VehicleAc;
+  vehicleCategory?: VehicleCategory;
+  travellerCount?: number;
+  requiredDriverHours?: number;
   estimatedKm?: number;
-
+  specialInstructions: string;
   paymentMethod: "Cash" | "UPI";
 };
 
@@ -77,11 +79,45 @@ function formatMoney(amount?: number) {
   }).format(n);
 }
 
+function formatDuration(minutes: number): string {
+  if (!Number.isFinite(minutes) || minutes < 0) return "-";
+
+  const totalMinutes = Math.round(minutes);
+
+  if (totalMinutes < 60) {
+    return `${totalMinutes} min`;
+  }
+
+  const hours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
+
+  if (remainingMinutes === 0) {
+    return `${hours} hr${hours === 1 ? "" : "s"}`;
+  }
+
+  return `${hours} hr${hours === 1 ? "" : "s"} ${remainingMinutes} min`;
+}
+
 function coercePositiveInt(v: unknown): number | undefined {
   const n = typeof v === "number" ? v : Number(v);
   if (!Number.isFinite(n)) return undefined;
   if (n <= 0) return undefined;
   return n;
+}
+
+function classifyTripType(
+  pickupLabel: string,
+  dropLabel: string,
+): "Local" | "Outstation" {
+  const pickupPincode = extractPincode(pickupLabel);
+  const dropPincode = extractPincode(dropLabel);
+
+  return pickupPincode &&
+    dropPincode &&
+    isLocalPincode(pickupPincode) &&
+    isLocalPincode(dropPincode)
+    ? "Local"
+    : "Outstation";
 }
 
 type SelectCardProps = {
@@ -142,28 +178,42 @@ function SelectCard({
   );
 }
 
-export default function BookingForm() {
+export default function BookingForm({
+  serviceType,
+}: {
+  serviceType: ServiceType;
+}) {
   const today = useMemo(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   }, []);
 
+  const minBookingDate = useMemo(() => {
+    const date = new Date(today);
+    date.setDate(date.getDate() + 1);
+    return date;
+  }, [today]);
+
+  const maxBookingDate = useMemo(() => {
+    const date = new Date(today);
+    date.setDate(date.getDate() + 15);
+    return date;
+  }, [today]);
+
   const [values, setValues] = useState<BookingFormValues>({
     customerName: "",
     mobileNumber: "",
     email: "",
-    serviceType: "Driver Only",
+    serviceType,
     pickupLocation: "",
     dropLocation: "",
-    pickupDate: formatDateYYYYMMDD(today),
+    pickupDate: formatDateYYYYMMDD(minBookingDate),
     pickupTime: "",
-    vehicleType: "AC",
-    numberOfPassengers: 1,
-    specialInstructions: "",
-
-    carType: "AC",
-    estimatedHours: 1,
+    vehicleAc: "AC",
+    vehicleCategory: "Sedan",
+    travellerCount: 1,
     estimatedKm: undefined,
+    specialInstructions: "",
     paymentMethod: "Cash",
   });
 
@@ -198,15 +248,20 @@ export default function BookingForm() {
   const activeRequestIdRef = useRef(0);
   const submissionRef = useRef(false);
 
-  const vehicleType = values.vehicleType;
-
   const derived = useMemo(() => {
-    const carType =
-      values.serviceType === "Car with Driver" ? vehicleType : undefined;
+    const vehicleCategory =
+      values.serviceType === "Car with Driver"
+        ? values.vehicleCategory
+        : undefined;
+
+    const vehicleAc =
+      values.serviceType === "Car with Driver"
+        ? values.vehicleAc
+        : undefined;
 
     const estimatedHours =
       values.serviceType === "Driver Only"
-        ? Math.max(1, Number(values.numberOfPassengers) || 1)
+        ? coercePositiveInt(values.requiredDriverHours)
         : undefined;
 
     const estimatedKm =
@@ -214,8 +269,29 @@ export default function BookingForm() {
         ? coercePositiveInt(values.estimatedKm)
         : undefined;
 
-    return { carType, estimatedHours, estimatedKm };
-  }, [values.estimatedKm, values.numberOfPassengers, values.serviceType, vehicleType]);
+    const tripType =
+      values.serviceType === "Car with Driver" &&
+      pickupSelected &&
+      dropSelected
+        ? classifyTripType(pickupSelected.label, dropSelected.label)
+        : undefined;
+
+    return {
+      tripType,
+      vehicleCategory,
+      vehicleAc,
+      estimatedHours,
+      estimatedKm,
+    };
+  }, [
+    dropSelected,
+    pickupSelected,
+    values.estimatedKm,
+    values.requiredDriverHours,
+    values.serviceType,
+    values.vehicleAc,
+    values.vehicleCategory,
+  ]);
 
   function validateClientSide(next: BookingFormValues): InlineErrors {
     const e: InlineErrors = {};
@@ -230,10 +306,20 @@ export default function BookingForm() {
     else if (!isPhoneValid(next.mobileNumber))
       e.mobileNumber = "Please enter a valid mobile number";
 
-    if (!next.pickupDate) e.pickupDate = "Pickup date is required";
-    else {
+    if (!next.pickupDate) {
+      e.pickupDate = "Pickup date is required";
+    } else {
       const selected = new Date(next.pickupDate + "T00:00:00");
-      if (selected < today) e.pickupDate = "Pickup date cannot be in the past";
+
+      if (selected <= today) {
+        e.pickupDate =
+          next.serviceType === "Driver Only"
+            ? "Same-day booking is not available. Please book at least 1 day in advance so that our admin team can assign a driver for your trip."
+            : "Same-day booking is not available. Please book at least 1 day in advance so that our admin team can assign a driver/car for your trip.";
+      } else if (selected > maxBookingDate) {
+        e.pickupDate =
+          "Booking date not available. You can book only up to 15 days in advance.";
+      }
     }
 
     if (!next.pickupTime.trim()) e.pickupTime = "Pickup time is required";
@@ -245,19 +331,28 @@ export default function BookingForm() {
       e.serviceType = "Service type is required";
     }
 
-    if (next.serviceType === "Car with Driver" && !next.vehicleType) {
-      e.vehicleType = "Car type is required for Car with Driver service";
+    if (next.serviceType === "Car with Driver") {
+      if (!next.vehicleCategory) {
+        e.vehicleCategory = "Vehicle category is required";
+      }
+
+      if (!next.vehicleAc) {
+        e.vehicleAc = "AC / Non-AC selection is required";
+      }
+
+      if (!next.travellerCount || next.travellerCount < 1) {
+        e.travellerCount = "Number of travellers must be at least 1";
+      }
+
+      if (!derived.estimatedKm || derived.estimatedKm < 1) {
+        e.estimatedKm = "Estimated kilometers must be greater than 0";
+      }
     }
 
     if (next.serviceType === "Driver Only") {
       if (!derived.estimatedHours || derived.estimatedHours < 1) {
-        e.numberOfPassengers = "Estimated hours are required";
-      }
-    }
-
-    if (next.serviceType === "Car with Driver") {
-      if (!derived.estimatedKm || derived.estimatedKm < 1) {
-        e.estimatedKm = "Estimated kilometers must be greater than 0";
+        e.requiredDriverHours =
+          "Required Driver Hours must be at least 1 hour.";
       }
     }
 
@@ -273,6 +368,56 @@ export default function BookingForm() {
     setSubmitError(null);
     setBookingSuccess(null);
     setSuccessVisible(false);
+  }
+
+  function handlePickupDateChange(value: string) {
+    setField("pickupDate", value);
+
+    if (!value || value.length !== 10) return;
+
+    const selected = new Date(value + "T00:00:00");
+
+    if (Number.isNaN(selected.getTime())) {
+      setInlineErrors((prev) => ({
+        ...prev,
+        pickupDate: "Please enter a valid booking date.",
+      }));
+      return;
+    }
+
+    if (selected < today) {
+      setInlineErrors((prev) => ({
+        ...prev,
+        pickupDate:
+          "Past dates are not available. Please select a future booking date.",
+      }));
+      return;
+    }
+
+    if (selected.getTime() === today.getTime()) {
+      setInlineErrors((prev) => ({
+        ...prev,
+        pickupDate:
+          values.serviceType === "Driver Only"
+            ? "Same-day booking is not available. Please book at least 1 day in advance so that our admin team can assign a driver for your trip."
+            : "Same-day booking is not available. Please book at least 1 day in advance so that our admin team can assign a driver/car for your trip.",
+      }));
+      return;
+    }
+
+    if (selected > maxBookingDate) {
+      setInlineErrors((prev) => ({
+        ...prev,
+        pickupDate:
+          "Booking date not available. You can book only up to 15 days in advance.",
+      }));
+      return;
+    }
+
+    setInlineErrors((prev) => ({
+      ...prev,
+      pickupDate: undefined,
+    }));
   }
 
   function changeLocation(field: "pickupLocation" | "dropLocation", value: string) {
@@ -291,11 +436,45 @@ export default function BookingForm() {
   }, [values.pickupLocation, values.dropLocation, pickupSelected]);
 
   useEffect(() => {
-    if (values.serviceType !== "Car with Driver" || !pickupSelected || !dropSelected) return;
+    if (
+      values.serviceType !== "Car with Driver" ||
+      !pickupSelected ||
+      !dropSelected
+    ) {
+      return;
+    }
+
     let active = true;
-    queueMicrotask(() => { if (active) { setRouteLoading(true); setRouteError(null); } });
-    void getRouteDistance(pickupSelected, dropSelected).then((route) => { if (active) { setField("estimatedKm", route.distanceKm); setRouteDuration(route.durationMinutes); } }).catch(() => { if (active) setRouteError("Unable to calculate a driving route for these locations."); }).finally(() => { if (active) setRouteLoading(false); });
-    return () => { active = false; };
+
+    queueMicrotask(() => {
+      if (active) {
+        setRouteLoading(true);
+        setRouteError(null);
+      }
+    });
+
+    void getRouteDistance(pickupSelected, dropSelected)
+      .then((route) => {
+        if (!active) return;
+
+        if (values.serviceType === "Car with Driver") {
+          setField("estimatedKm", route.distanceKm);
+        }
+
+        setRouteDuration(route.durationMinutes);
+      })
+      .catch(() => {
+        if (active) {
+          setRouteError("Unable to calculate a driving route for these locations.");
+        }
+      })
+      .finally(() => {
+        if (active) setRouteLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [values.serviceType, pickupSelected, dropSelected]);
 
   const commonPricingInputsReady =
@@ -304,12 +483,18 @@ export default function BookingForm() {
     !!values.pickupDate &&
     values.pickupTime.trim().length > 0 &&
     !!values.paymentMethod &&
-    !!values.serviceType && !!pickupSelected && !!dropSelected;
+    !!values.serviceType;
   const pricingInputsReady =
     commonPricingInputsReady &&
     (values.serviceType === "Driver Only"
       ? (coercePositiveInt(derived.estimatedHours) ?? 0) >= 1
-      : (coercePositiveInt(derived.estimatedKm) ?? 0) >= 1 && !routeLoading);
+      : !!derived.tripType &&
+        !!pickupSelected &&
+        !!dropSelected &&
+        !!derived.vehicleCategory &&
+        !!derived.vehicleAc &&
+        (coercePositiveInt(derived.estimatedKm) ?? 0) >= 1 &&
+        !routeLoading);
 
     const pricingSucceeded =
     estimateError == null && !estimateLoading && estimatedTotal != null;
@@ -321,7 +506,9 @@ export default function BookingForm() {
       pickupLocation: values.pickupLocation.trim(),
       dropLocation: values.dropLocation.trim(),
       serviceType: values.serviceType,
-      carType: derived.carType,
+      tripType: derived.tripType,
+      vehicleCategory: derived.vehicleCategory,
+      vehicleAc: derived.vehicleAc,
       estimatedHours: derived.estimatedHours,
       estimatedKm: derived.estimatedKm,
       bookingDate: values.pickupDate,
@@ -331,9 +518,11 @@ export default function BookingForm() {
 
     return base;
   }, [
-    derived.carType,
     derived.estimatedHours,
     derived.estimatedKm,
+    derived.tripType,
+    derived.vehicleAc,
+    derived.vehicleCategory,
     values.dropLocation,
     values.paymentMethod,
     values.pickupDate,
@@ -379,7 +568,12 @@ export default function BookingForm() {
         );
 
         setEstimatedDuration(
-          routeDuration ?? (typeof data?.estimatedDuration === "number" ? data.estimatedDuration : null),
+          values.serviceType === "Car with Driver"
+            ? routeDuration ??
+              (typeof data?.estimatedDuration === "number"
+                ? data.estimatedDuration
+                : null)
+            : null,
         );
 
         setEstimateLoading(false);
@@ -416,7 +610,13 @@ export default function BookingForm() {
       mobileNumber: values.mobileNumber.trim(),
       email: values.email?.trim() || undefined,
       serviceType: values.serviceType,
-      carType: derived.carType,
+      tripType: derived.tripType,
+      vehicleCategory: derived.vehicleCategory,
+      vehicleAc: derived.vehicleAc,
+      travellerCount:
+        values.serviceType === "Car with Driver"
+          ? values.travellerCount
+          : undefined,
       pickupLocation: values.pickupLocation.trim(),
       dropLocation: values.dropLocation.trim(),
       bookingDate: values.pickupDate,
@@ -460,17 +660,17 @@ export default function BookingForm() {
             customerName: "",
             mobileNumber: "",
             email: "",
-            serviceType: "Driver Only",
+            serviceType,
             pickupLocation: "",
             dropLocation: "",
-            pickupDate: formatDateYYYYMMDD(today),
+            pickupDate: formatDateYYYYMMDD(minBookingDate),
             pickupTime: "",
-            vehicleType: "AC",
-            numberOfPassengers: 1,
-            specialInstructions: "",
-            carType: "AC",
-            estimatedHours: 1,
+            vehicleAc: "AC",
+            vehicleCategory: "Sedan",
+            travellerCount: 1,
+            requiredDriverHours: undefined,
             estimatedKm: undefined,
+            specialInstructions: "",
             paymentMethod: "Cash",
           });
 
@@ -494,7 +694,10 @@ export default function BookingForm() {
             pickupDate: mapped.bookingDate,
             pickupTime: mapped.pickupTime,
             serviceType: mapped.serviceType,
-            vehicleType: mapped.carType,
+            vehicleCategory: mapped.vehicleCategory,
+            vehicleAc: mapped.vehicleAc,
+            travellerCount: mapped.travellerCount,
+            requiredDriverHours: mapped.estimatedHours,
             estimatedKm: mapped.estimatedKm,
           };
 
@@ -513,6 +716,38 @@ export default function BookingForm() {
   }
 
   const confirmDisabled = isSubmitting || estimateLoading || !pricingSucceeded;
+  const bookingSummary = [
+    {
+      label: "Ride Type",
+      value:
+        values.serviceType === "Driver Only" ? "Driver Only" : "Car + Driver",
+    },
+    ...(values.serviceType === "Driver Only"
+      ? [
+          {
+            label: "Booked Hours",
+            value:
+              derived.estimatedHours != null
+                ? `${derived.estimatedHours} hrs`
+                : "-",
+          },
+        ]
+      : [
+          { label: "Vehicle Category", value: values.vehicleCategory ?? "-" },
+          { label: "AC / Non-AC", value: values.vehicleAc },
+          { label: "Estimated Distance", value: `${values.estimatedKm ?? "-"} km` },
+          {
+            label: "Estimated Duration",
+            value:
+              estimatedDuration != null
+                ? formatDuration(estimatedDuration)
+                : "-",
+          },
+        ]),
+    { label: "Payment Method", value: values.paymentMethod },
+    { label: "Pickup", value: values.pickupLocation || "-" },
+    { label: "Drop", value: values.dropLocation || "-" },
+  ];
 
 
   if (bookingSuccess && successVisible) {
@@ -605,13 +840,18 @@ export default function BookingForm() {
         <CardContent className="p-0">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_360px]">
             <div className="p-6">
-              <div className="mb-5">
-                <h2 className="text-base font-bold text-slate-900">
-                  Customer Details
-                </h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  Enter the details we can use to contact you about this booking.
-                </p>
+              <div className="mb-5 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Customer Details
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Enter the details we can use to contact you about this booking.
+                  </p>
+                </div>
+                <Button asChild type="button" variant="secondary" size="sm">
+                  <Link href="/booking">Change Service</Link>
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
@@ -622,7 +862,7 @@ export default function BookingForm() {
                   <Input
                     value={values.customerName}
                     onChange={(ev) => setField("customerName", ev.target.value)}
-                    placeholder="John Doe"
+                    placeholder="Amankumar"
                     aria-invalid={!!inlineErrors.customerName}
                   />
                   {inlineErrors.customerName ? (
@@ -657,44 +897,9 @@ export default function BookingForm() {
                   <Input
                     value={values.email}
                     onChange={(ev) => setField("email", ev.target.value)}
-                    placeholder="john@example.com"
+                    placeholder="amankumar@example.com"
                     inputMode="email"
                   />
-                </div>
-
-                <div className="md:col-span-2">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-[#0F172A]">
-                        Service Type *
-                      </label>
-                      <p className="mt-1 text-xs text-[#64748B]">
-                        Choose the ride option that matches how you want to
-                        travel.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <SelectCard
-                      title="Driver Only"
-                      description="For when you already have a car."
-                      selected={values.serviceType === "Driver Only"}
-                      onSelect={() => setField("serviceType", "Driver Only")}
-                    />
-                    <SelectCard
-                      title="Car + Driver"
-                      description="We arrange both car and driver."
-                      selected={values.serviceType === "Car with Driver"}
-                      onSelect={() =>
-                        setField("serviceType", "Car with Driver")
-                      }
-                    />
-                  </div>
-                  {inlineErrors.serviceType ? (
-                    <p className="mt-2 text-sm text-[#DC2626]" role="alert">
-                      {inlineErrors.serviceType}
-                    </p>
-                  ) : null}
                 </div>
 
                 <div>
@@ -740,8 +945,9 @@ export default function BookingForm() {
                   <Input
                     type="date"
                     value={values.pickupDate}
-                    min={formatDateYYYYMMDD(today)}
-                    onChange={(ev) => setField("pickupDate", ev.target.value)}
+                    min={formatDateYYYYMMDD(minBookingDate)}
+                    max={formatDateYYYYMMDD(maxBookingDate)}
+                    onChange={(ev) => handlePickupDateChange(ev.target.value)}
                   />
                   {inlineErrors.pickupDate ? (
                     <p className="mt-1 text-sm text-[#DC2626]" role="alert">
@@ -767,75 +973,141 @@ export default function BookingForm() {
                   ) : null}
                 </div>
 
-                <div className="md:col-span-2 pt-2">
-                  <div className="mb-3">
-                    <h2 className="text-base font-bold text-slate-900">
-                      Vehicle Preference
-                    </h2>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Select your preferred vehicle type for the ride.
-                    </p>
-                  </div>
-                </div>
+                {values.serviceType === "Car with Driver" ? (
+                  <>
+                    <div className="md:col-span-2 pt-2">
+                      <div className="mb-3">
+                        <h2 className="text-base font-bold text-slate-900">
+                          Vehicle Preference
+                        </h2>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Select your vehicle category and AC / Non-AC preference.
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="md:col-span-2">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-[#0F172A]">
+                        Vehicle Category *
+                      </label>
+                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <SelectCard
+                          title="Mini"
+                          selected={values.vehicleCategory === "Mini"}
+                          onSelect={() => setField("vehicleCategory", "Mini")}
+                          description="Compact option for smaller groups."
+                        />
+                        <SelectCard
+                          title="Sedan"
+                          selected={values.vehicleCategory === "Sedan"}
+                          onSelect={() => setField("vehicleCategory", "Sedan")}
+                          description="Comfortable option for everyday travel."
+                        />
+                        <SelectCard
+                          title="XL – 7 Seater"
+                          selected={values.vehicleCategory === "XL – 7 Seater"}
+                          onSelect={() =>
+                            setField("vehicleCategory", "XL – 7 Seater")
+                          }
+                          description="More space for larger groups."
+                        />
+                        <SelectCard
+                          title="Force Traveller"
+                          selected={values.vehicleCategory === "Force Traveller"}
+                          onSelect={() =>
+                            setField("vehicleCategory", "Force Traveller")
+                          }
+                          description="Large option for group journeys and tours."
+                        />
+                      </div>
+                      {inlineErrors.vehicleCategory ? (
+                        <p className="mt-1 text-sm text-[#DC2626]" role="alert">
+                          {inlineErrors.vehicleCategory}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-[#0F172A]">
                         AC / Non-AC *
                       </label>
-                      <p className="mt-1 text-xs text-[#64748B]">
-                        {values.serviceType === "Car with Driver"
-                          ? "Your AC / Non-AC preference will be applied."
-                          : "You can select AC / Non-AC now—this will apply when choosing Car + Driver."}
-                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-3">
+                        <SelectCard
+                          title="AC"
+                          selected={values.vehicleAc === "AC"}
+                          onSelect={() => setField("vehicleAc", "AC")}
+                          description="Cool and comfortable."
+                        />
+                        <SelectCard
+                          title="Non-AC"
+                          selected={values.vehicleAc === "Non-AC"}
+                          onSelect={() => setField("vehicleAc", "Non-AC")}
+                          description="Budget-friendly option."
+                        />
+                      </div>
+                      {inlineErrors.vehicleAc ? (
+                        <p className="mt-1 text-sm text-[#DC2626]" role="alert">
+                          {inlineErrors.vehicleAc}
+                        </p>
+                      ) : null}
                     </div>
-                    <Badge tone="neutral">
-                      {values.serviceType === "Car with Driver"
-                        ? "Preference active"
-                        : "Preference saved"}
-                    </Badge>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <SelectCard
-                      title="AC"
-                      selected={values.vehicleType === "AC"}
-                      onSelect={() => setField("vehicleType", "AC")}
-                      description="Cool and comfortable."
-                    />
-                    <SelectCard
-                      title="Non-AC"
-                      selected={values.vehicleType === "Non-AC"}
-                      onSelect={() => setField("vehicleType", "Non-AC")}
-                      description="Budget-friendly option."
-                    />
-                  </div>
-                </div>
 
-                {values.serviceType === "Driver Only" ? (
+                    <div className="md:col-span-2">
+                      <label className="mb-1 block text-sm font-medium text-[#0F172A]">
+                        Number of Travellers *
+                      </label>
+                      <p className="mb-2 text-xs text-[#64748B]">
+                        How many people will be travelling?
+                      </p>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={values.travellerCount ?? 1}
+                        onChange={(ev) =>
+                          setField(
+                            "travellerCount",
+                            Math.max(1, Number(ev.target.value) || 1),
+                          )
+                        }
+                        aria-invalid={!!inlineErrors.travellerCount}
+                      />
+                      {inlineErrors.travellerCount ? (
+                        <p className="mt-1 text-sm text-[#DC2626]" role="alert">
+                          {inlineErrors.travellerCount}
+                        </p>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
                   <div className="md:col-span-2">
                     <label className="mb-1 block text-sm font-medium text-[#0F172A]">
-                      Estimated Hours *
+                      Required Driver Hours *
                     </label>
+                    <p className="mb-2 text-xs text-[#64748B]">
+                      Select the number of hours you need a professional driver.
+                    </p>
                     <Input
                       type="number"
                       min={1}
-                      value={values.numberOfPassengers}
+                      step={1}
+                      value={values.requiredDriverHours ?? ""}
                       onChange={(ev) =>
                         setField(
-                          "numberOfPassengers",
-                          Math.max(1, Number(ev.target.value) || 1),
+                          "requiredDriverHours",
+                          ev.target.value === ""
+                            ? undefined
+                            : Math.max(1, Number(ev.target.value) || 1),
                         )
                       }
-                      aria-invalid={!!inlineErrors.numberOfPassengers}
+                      aria-invalid={!!inlineErrors.requiredDriverHours}
                     />
-                    {inlineErrors.numberOfPassengers ? (
+                    {inlineErrors.requiredDriverHours ? (
                       <p className="mt-1 text-sm text-[#DC2626]" role="alert">
-                        {inlineErrors.numberOfPassengers}
+                        {inlineErrors.requiredDriverHours}
                       </p>
                     ) : null}
                   </div>
-                ) : null}
+                )}
 
                 {values.serviceType === "Car with Driver" ? (
                   <div className="md:col-span-2">
@@ -844,13 +1116,31 @@ export default function BookingForm() {
                     </label>
                     <Input
                       readOnly
-                      value={routeLoading ? "Calculating route…" : values.estimatedKm ? `${values.estimatedKm} KM${routeDuration ? ` · ~${routeDuration} min` : ""}` : "Select pickup and drop locations"}
+                      value={
+  routeLoading
+    ? "Calculating route…"
+    : values.estimatedKm
+      ? `${values.estimatedKm} KM${routeDuration ? ` · ~${formatDuration(routeDuration)}` : ""}`
+      : "Select pickup and drop locations"
+}
                     />
                     {routeError || inlineErrors.estimatedKm ? (
                       <p className="mt-1 text-sm text-[#DC2626]" role="alert">
                         {routeError || inlineErrors.estimatedKm}
                       </p>
                     ) : null}
+                  </div>
+                ) : null}
+
+                {values.serviceType === "Car with Driver" &&
+                derived.tripType ? (
+                  <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-900">
+                      Trip Type: {derived.tripType}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Based on your pickup and drop locations.
+                    </p>
                   </div>
                 ) : null}
 
@@ -1004,7 +1294,7 @@ export default function BookingForm() {
                         <div className="flex items-center justify-between gap-4">
                           <div>
                             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                              Estimated Cost
+                              Booked-hours Charge
                             </p>
                             <p className="mt-1 text-xs text-slate-400">
                               Based on your selected trip details
@@ -1028,7 +1318,7 @@ export default function BookingForm() {
 
                         <div className="flex items-start justify-between gap-4">
                           <span className="text-xs font-semibold text-[#64748B]">
-                            ₹ / Hour
+                            Hourly Rate
                           </span>
                           <span className="text-right font-semibold text-[#0F172A]">
                             {typeof (fareBreakdown ?? {}) === "object" &&
@@ -1052,7 +1342,7 @@ export default function BookingForm() {
 
                         <div className="flex items-start justify-between gap-4">
                           <span className="text-xs font-semibold text-[#64748B]">
-                            Estimated Hours
+                            Booked Hours
                           </span>
                           <span className="text-right font-semibold text-[#0F172A]">
                             {estimateLoading ? (
@@ -1095,10 +1385,6 @@ export default function BookingForm() {
                               [
                                 "Waiting Charge",
                                 fareBreakdown?.waitingCharge,
-                              ],
-                              [
-                                "Airport Charge",
-                                fareBreakdown?.airportCharge,
                               ],
                               ["Night Charge", fareBreakdown?.nightCharge],
                               [
@@ -1162,38 +1448,7 @@ export default function BookingForm() {
                       Booking Summary
                     </p>
                     <div className="mt-3 space-y-3 text-sm">
-                      {(
-                        [
-                          [
-                            "Ride Type",
-                            values.serviceType === "Driver Only"
-                              ? "Driver Only"
-                              : "Car + Driver",
-                          ],
-                          [
-                            "Vehicle Type",
-                            values.serviceType === "Car with Driver"
-                              ? values.vehicleType
-                              : values.vehicleType,
-                          ],
-                          ["AC / Non-AC", values.vehicleType],
-                          [
-                            "Estimated Hours",
-                            values.serviceType === "Driver Only"
-                              ? values.numberOfPassengers
-                              : undefined,
-                          ],
-                          [
-                            "Estimated Duration",
-                            estimatedDuration != null
-                              ? `${estimatedDuration} mins`
-                              : undefined,
-                          ],
-                          ["Payment Method", values.paymentMethod],
-                          ["Pickup", values.pickupLocation || undefined],
-                          ["Drop", values.dropLocation || undefined],
-                        ] as const
-                      ).map(([label, val]) => (
+                      {bookingSummary.map(({ label, value }) => (
                         <div
                           key={label}
                           className="flex items-start justify-between gap-4"
@@ -1206,11 +1461,7 @@ export default function BookingForm() {
                             label !== "Pickup" &&
                             label !== "Drop" ? (
                               <Skeleton className="ml-auto h-4 w-24" />
-                            ) : typeof val === "string" ? (
-                              val
-                            ) : (
-                              "-"
-                            )}
+                            ) : value}
                           </span>
                         </div>
                       ))}
@@ -1233,42 +1484,104 @@ export default function BookingForm() {
                 Estimated fare. Final fare may vary depending on actual trip
                 conditions.
               </p>
-              <div className="mt-4">
-                <p className="text-xs font-semibold text-[#64748B]">
-                  Estimated Total
-                </p>
-                <p className="mt-1 text-xl font-extrabold text-[#0F172A]">
-                  {estimateLoading
-                    ? "-"
-                    : estimatedTotal != null
-                      ? formatMoney(estimatedTotal)
-                      : "-"}
-                </p>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-                {(
-                  [
-                    ["Base Fare", fareBreakdown?.baseFare],
-                    ["Distance", fareBreakdown?.distanceCharge],
-                    ["Waiting", fareBreakdown?.waitingCharge],
-                    ["Airport", fareBreakdown?.airportCharge],
-                    ["Night", fareBreakdown?.nightCharge],
-                    ["Weekend", fareBreakdown?.weekendCharge],
-                    ["GST", fareBreakdown?.gst],
-                  ] as const
-                ).map(([label, v]) => (
-                  <div key={label}>
-                    <p className="text-xs text-[#64748B]">{label}</p>
-                    {estimateLoading ? (
-                      <Skeleton className="mt-1 h-4 w-16" />
-                    ) : (
-                      <p className="mt-1 font-semibold text-[#0F172A]">
-                        {typeof v === "number" ? formatMoney(v) : "-"}
+              {values.serviceType === "Driver Only" ? (
+                <div className="mt-4 rounded-xl bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Booked-hours Charge
                       </p>
-                    )}
+                      <p className="mt-1 text-xs text-slate-400">
+                        Based on your selected trip details
+                      </p>
+                    </div>
+
+                    <div className="text-right">
+                      {estimateLoading ? (
+                        <Skeleton className="h-7 w-24" />
+                      ) : estimatedTotal != null ? (
+                        <p className="text-2xl font-bold text-slate-950">
+                          {formatMoney(estimatedTotal)}
+                        </p>
+                      ) : (
+                        <p className="text-2xl font-bold text-slate-400">
+                          —
+                        </p>
+                      )}
+                    </div>
                   </div>
-                ))}
-              </div>
+
+                  <div className="mt-4 flex items-center justify-between gap-4">
+                    <span className="text-xs font-semibold text-[#64748B]">
+                      Hourly Rate
+                    </span>
+                    <span className="font-semibold text-[#0F172A]">
+                      {typeof (fareBreakdown ?? {}) === "object" &&
+                      typeof (fareBreakdown as { hourlyRate?: number })
+                        ?.hourlyRate === "number"
+                        ? formatMoney(
+                            (fareBreakdown as { hourlyRate?: number })
+                              .hourlyRate,
+                          )
+                        : "-"}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-4">
+                    <span className="text-xs font-semibold text-[#64748B]">
+                      Booked Hours
+                    </span>
+                    <span className="font-semibold text-[#0F172A]">
+                      {estimateLoading
+                        ? "-"
+                        : derived.estimatedHours != null
+                          ? `${derived.estimatedHours} hrs`
+                          : "-"}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-[#0F172A]">
+                        Estimated Total
+                      </p>
+                      {estimateLoading ? (
+                        <Skeleton className="h-5 w-28" />
+                      ) : (
+                        <p className="text-lg font-extrabold text-[#0F172A]">
+                          {estimatedTotal != null
+                            ? formatMoney(estimatedTotal)
+                            : "-"}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
+                  {(
+                    [
+                      ["Base Fare", fareBreakdown?.baseFare],
+                      ["Distance", fareBreakdown?.distanceCharge],
+                      ["Waiting", fareBreakdown?.waitingCharge],
+                      ["Night", fareBreakdown?.nightCharge],
+                      ["Weekend", fareBreakdown?.weekendCharge],
+                      ["GST", fareBreakdown?.gst],
+                    ] as const
+                  ).map(([label, v]) => (
+                    <div key={label}>
+                      <p className="text-xs text-[#64748B]">{label}</p>
+                      {estimateLoading ? (
+                        <Skeleton className="mt-1 h-4 w-16" />
+                      ) : (
+                        <p className="mt-1 font-semibold text-[#0F172A]">
+                          {typeof v === "number" ? formatMoney(v) : "-"}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1278,39 +1591,7 @@ export default function BookingForm() {
                 Booking Summary
               </p>
               <div className="mt-3 space-y-2 text-sm">
-                {(
-                  [
-                    [
-                      "Ride Type",
-                      values.serviceType === "Driver Only"
-                        ? "Driver Only"
-                        : "Car + Driver",
-                    ],
-                    ["Vehicle Type", values.vehicleType],
-                    ["AC / Non-AC", values.vehicleType],
-                    [
-                      "Estimated Hours",
-                      values.serviceType === "Driver Only"
-                        ? `${values.numberOfPassengers} hrs`
-                        : "-",
-                    ],
-                    [
-                      "Estimated Distance",
-                      values.serviceType === "Car with Driver"
-                        ? `${values.numberOfPassengers} km`
-                        : "-",
-                    ],
-                    [
-                      "Estimated Duration",
-                      estimatedDuration != null
-                        ? `${estimatedDuration} mins`
-                        : "-",
-                    ],
-                    ["Payment Method", values.paymentMethod],
-                    ["Pickup", values.pickupLocation || "-"],
-                    ["Drop", values.dropLocation || "-"],
-                  ] as const
-                ).map(([label, val]) => (
+                {bookingSummary.map(({ label, value }) => (
                   <div
                     key={label}
                     className="flex items-start justify-between gap-4"
@@ -1319,7 +1600,7 @@ export default function BookingForm() {
                       {label}
                     </span>
                     <span className="max-w-[60%] text-right font-semibold text-[#0F172A]">
-                      {val}
+                      {value}
                     </span>
                   </div>
                 ))}

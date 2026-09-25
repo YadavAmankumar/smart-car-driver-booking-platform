@@ -23,16 +23,38 @@ const bookingSchema = new mongoose.Schema(
       match: [/^[6-9]\d{9}$/, "Please enter a valid mobile number"],
     },
 
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: "",
+    },
+
     serviceType: {
       type: String,
       required: [true, "Service type is required"],
       enum: ["Driver Only", "Car with Driver"],
     },
 
-    // Required only when serviceType = "Car with Driver"
-    carType: {
+    // Used for Car with Driver bookings
+    tripType: {
+      type: String,
+      enum: ["Local", "Outstation"],
+    },
+
+    vehicleCategory: {
+      type: String,
+      enum: ["Mini", "Sedan", "XL – 7 Seater", "Force Traveller"],
+    },
+
+    vehicleAc: {
       type: String,
       enum: ["AC", "Non-AC"],
+    },
+
+    travellerCount: {
+      type: Number,
+      min: 1,
     },
 
     pickupLocation: {

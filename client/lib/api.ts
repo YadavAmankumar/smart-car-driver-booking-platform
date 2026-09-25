@@ -6,7 +6,10 @@ export type BookingPayload = {
   mobileNumber: string;
   email?: string;
   serviceType: "Driver Only" | "Car with Driver";
-  carType?: "AC" | "Non-AC";
+  tripType?: "Local" | "Outstation";
+  vehicleCategory?: "Mini" | "Sedan" | "XL – 7 Seater" | "Force Traveller";
+  vehicleAc?: "AC" | "Non-AC";
+  travellerCount?: number;
   pickupLocation: string;
   dropLocation: string;
   bookingDate: string; // YYYY-MM-DD or ISO string
@@ -15,8 +18,6 @@ export type BookingPayload = {
   estimatedKm?: number;
   paymentMethod: "Cash" | "UPI";
   notes?: string;
-  // Frontend form includes additional fields like passengers;
-  // backend currently does not validate/persist them.
 };
 
 export type BackendValidationError = {
@@ -40,12 +41,17 @@ type Booking = {
   _id?: string;
   customerName?: string;
   mobileNumber?: string;
+  email?: string;
   serviceType?: string;
-  carType?: string;
+  tripType?: "Local" | "Outstation";
+  vehicleCategory?: "Mini" | "Sedan" | "XL – 7 Seater" | "Force Traveller";
+  vehicleAc?: "AC" | "Non-AC";
+  travellerCount?: number;
   pickupLocation?: string;
   dropLocation?: string;
   bookingDate?: string;
   pickupTime?: string;
+  estimatedHours?: number;
   paymentMethod?: string;
   bookingStatus?: string;
   notes?: string;
@@ -121,7 +127,9 @@ export type EstimatePricingPayload = {
   pickupLocation: string;
   dropLocation: string;
   serviceType: "Driver Only" | "Car with Driver";
-  carType?: "AC" | "Non-AC";
+  tripType?: "Local" | "Outstation";
+  vehicleCategory?: "Mini" | "Sedan" | "XL – 7 Seater" | "Force Traveller";
+  vehicleAc?: "AC" | "Non-AC";
   estimatedHours?: number;
   estimatedKm?: number;
   bookingDate: string;
@@ -131,6 +139,7 @@ export type EstimatePricingPayload = {
 
 export type FareBreakdown = {
   baseFare?: number;
+  hourlyRate?: number;
   distanceCharge?: number;
   waitingCharge?: number;
   airportCharge?: number;
@@ -144,6 +153,7 @@ export type EstimatePricingResponse = {
   success?: boolean;
   data?: {
     baseFare?: number;
+    hourlyRate?: number;
     distanceCharge?: number;
     waitingCharge?: number;
     airportCharge?: number;
@@ -190,62 +200,100 @@ export async function getRouteDistance(pickup: LocationPoint, drop: LocationPoin
   return res.data.data;
 }
 
+export type VehiclePricing = {
+  baseFare?: number;
+  ratePerKm?: number;
+  minimumKm?: number;
+  extraKmCharge?: number;
+};
+
+export type VehicleCategoryPricing = {
+  ac?: VehiclePricing;
+  nonAc?: VehiclePricing;
+};
+
 export type AdminPricingResponse = {
   success?: boolean;
   data?: {
     id?: string;
     isActive?: boolean;
-    driverBaseFare?: number;
-    driverHourlyRate?: number;
-    driverExtraHourlyRate?: number;
-    driverMinimumHours?: number;
-    carDriverBaseFare?: number;
-    acRatePerKm?: number;
-    nonAcRatePerKm?: number;
-    minimumKm?: number;
-    extraKmCharge?: number;
-    driverAllowance?: number;
-    nightStay?: number;
-    tollCharge?: number;
-    stateTax?: number;
-    localBaseFare?: number;
-    localPerKmRate?: number;
-    waitingChargePerMinute?: number;
-    waitingGraceTimeMinutes?: number;
-    airportCharge?: number;
-    gstPercent?: number;
-    nightChargePercent?: number;
-    weekendChargePercent?: number;
-    minimumFare?: number;
-    nightChargeWindow?: { startHour?: number; endHour?: number };
+    driverOnly?: {
+      baseFare?: number;
+      hourlyRate?: number;
+      extraHourlyRate?: number;
+      minimumHours?: number;
+    };
+    carWithDriver?: {
+      local?: {
+        mini?: VehicleCategoryPricing;
+        sedan?: VehicleCategoryPricing;
+        xl7Seater?: VehicleCategoryPricing;
+        forceTraveller?: VehicleCategoryPricing;
+      };
+      outstation?: {
+        mini?: VehicleCategoryPricing;
+        sedan?: VehicleCategoryPricing;
+        xl7Seater?: VehicleCategoryPricing;
+        forceTraveller?: VehicleCategoryPricing;
+      };
+    };
+    outstationCharges?: {
+      driverAllowance?: number;
+      nightStay?: number;
+    };
+    common?: {
+      waitingChargePerMinute?: number;
+      waitingGraceTimeMinutes?: number;
+      gstPercent?: number;
+      nightChargePercent?: number;
+      weekendChargePercent?: number;
+      minimumFare?: number;
+      nightChargeWindow?: {
+        startHour?: number;
+        endHour?: number;
+      };
+    };
   };
   message?: string;
 };
 
 export type AdminPricingUpdatePayload = {
-  driverBaseFare?: number;
-  driverHourlyRate?: number;
-  driverExtraHourlyRate?: number;
-  driverMinimumHours?: number;
-  carDriverBaseFare?: number;
-  acRatePerKm?: number;
-  nonAcRatePerKm?: number;
-  minimumKm?: number;
-  extraKmCharge?: number;
-  driverAllowance?: number;
-  nightStay?: number;
-  tollCharge?: number;
-  stateTax?: number;
-  localBaseFare?: number;
-  localPerKmRate?: number;
-  waitingChargePerMinute?: number;
-  waitingGraceTimeMinutes?: number;
-  airportCharge?: number;
-  gstPercent?: number;
-  nightChargePercent?: number;
-  weekendChargePercent?: number;
-  minimumFare?: number;
-  nightChargeWindow?: { startHour?: number; endHour?: number };
+  driverOnly?: {
+    baseFare?: number;
+    hourlyRate?: number;
+    extraHourlyRate?: number;
+    minimumHours?: number;
+  };
+  carWithDriver?: {
+    local?: {
+      mini?: VehicleCategoryPricing;
+      sedan?: VehicleCategoryPricing;
+      xl7Seater?: VehicleCategoryPricing;
+      forceTraveller?: VehicleCategoryPricing;
+    };
+    outstation?: {
+      mini?: VehicleCategoryPricing;
+      sedan?: VehicleCategoryPricing;
+      xl7Seater?: VehicleCategoryPricing;
+      forceTraveller?: VehicleCategoryPricing;
+    };
+  };
+  outstationCharges?: {
+    driverAllowance?: number;
+    nightStay?: number;
+  };
+  common?: {
+    waitingChargePerMinute?: number;
+    waitingGraceTimeMinutes?: number;
+    gstPercent?: number;
+    nightChargePercent?: number;
+    weekendChargePercent?: number;
+    minimumFare?: number;
+    nightChargeWindow?: {
+      startHour?: number;
+      endHour?: number;
+    };
+  };
 };
 
 export async function getAdminPricing() {
@@ -732,12 +780,38 @@ export function parseBackendValidationErrors(
 // DELETE /api/v1/cars/:id
 // ---------------------------
 
-type Car = {
+export type AdminCarSchedule = {
+  _id?: string;
+  bookingDate?: string;
+  pickupTime?: string;
+  pickupLocation?: string;
+  dropLocation?: string;
+  bookingStatus?: "Pending" | "Confirmed" | "Ongoing" | "Completed" | "Cancelled" | string;
+  serviceType?: "Driver Only" | "Car with Driver" | string;
+  estimatedHours?: number;
+  estimatedKm?: number;
+  estimatedDuration?: number;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  driver?: {
+    _id?: string;
+    driverName?: string;
+    phoneNumber?: string;
+    experience?: number;
+  } | null;
+};
+
+export type Car = {
   _id?: string;
   carName?: string;
   carNumber?: string;
   carType?: string;
+  vehicleCategory?: "Mini" | "Sedan" | "XL – 7 Seater" | "Force Traveller";
   isAvailable?: boolean;
+  isAC?: boolean;
+  imageUrl?: string;
+  imagePublicId?: string;
+  schedule?: AdminCarSchedule[];
 };
 
 export type GetCarsResponse = {
@@ -750,6 +824,7 @@ export type CreateCarPayload = {
   carName: string;
   carNumber: string;
   carType: "Petrol" | "Diesel" | "CNG" | "EV";
+  vehicleCategory: "Mini" | "Sedan" | "XL – 7 Seater" | "Force Traveller";
   isAvailable: boolean;
   isAC: boolean;
 };
@@ -811,6 +886,40 @@ export async function updateCar(carId: string, payload: UpdateCarPayload) {
           Authorization: `Bearer ${token}`,
         }
       : undefined,
+  });
+
+  return res.data;
+}
+
+export async function uploadCarImage(carId: string, file: File) {
+  const token = getAuthToken();
+
+  const formData = new FormData();
+  formData.append("carImage", file);
+
+  const res = await api.post(`/cars/${carId}/image`, formData, {
+    headers: {
+      "Content-Type": undefined,
+      ...(token
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : {}),
+    },
+  });
+
+  return res.data;
+}
+
+export async function deleteCarImage(carId: string) {
+  const token = getAuthToken();
+
+  const res = await api.delete(`/cars/${carId}/image`, {
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : {},
   });
 
   return res.data;
