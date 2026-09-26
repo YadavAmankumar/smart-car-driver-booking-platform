@@ -32,6 +32,7 @@ export default function LoginFormBase({
   showRememberMe,
   onLogin,
   registerHref,
+  forgotPasswordHref,
 }: {
   title: string;
   subtitle?: string;
@@ -39,6 +40,7 @@ export default function LoginFormBase({
   role: "customer" | "driver" | "admin";
   showRememberMe?: boolean;
   registerHref?: string;
+  forgotPasswordHref?: string;
   onLogin: (values: LoginValues) => Promise<void>;
 }) {
 
@@ -85,11 +87,25 @@ export default function LoginFormBase({
     } catch (e) {
       const msg = errorDescriptionFromUnknown(e);
       const axMsg = getAxiosErrorMessage(e);
+      const isEmailNotVerified = axMsg
+        .toLowerCase()
+        .includes("please verify your email before logging in");
+
+      if (isEmailNotVerified) {
+        setError({
+          title: "Email not verified",
+          description:
+            "Please verify your email first. New user? Register and verify your email.",
+        });
+        return;
+      }
+
       const title =
         axMsg.toLowerCase().includes("invalid") ||
         axMsg.toLowerCase().includes("credentials")
           ? "Invalid credentials"
           : "Login failed";
+
       setError({ title, description: msg });
     } finally {
       setLoading(false);
@@ -178,21 +194,39 @@ export default function LoginFormBase({
                     <Checkbox {...form.register("rememberMe")} />
                     Remember Me
                   </label>
-                  <span className="text-xs text-[#94A3B8]">
-                    Forgot password
-                    <span className="ml-1 rounded-md bg-[#E2E8F0] px-2 py-1">
-                      disabled
+                  {forgotPasswordHref ? (
+                    <Link
+                      href={forgotPasswordHref}
+                      className="text-xs font-medium text-slate-600 transition hover:text-slate-950"
+                    >
+                      Forgot password?
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-[#94A3B8]">
+                      Forgot password
+                      <span className="ml-1 rounded-md bg-[#E2E8F0] px-2 py-1">
+                        disabled
+                      </span>
                     </span>
-                  </span>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#94A3B8]">
-                    Forgot password
-                    <span className="ml-1 rounded-md bg-[#E2E8F0] px-2 py-1">
-                      disabled
+                  {forgotPasswordHref ? (
+                    <Link
+                      href={forgotPasswordHref}
+                      className="text-xs font-medium text-slate-600 transition hover:text-slate-950"
+                    >
+                      Forgot password?
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-[#94A3B8]">
+                      Forgot password
+                      <span className="ml-1 rounded-md bg-[#E2E8F0] px-2 py-1">
+                        disabled
+                      </span>
                     </span>
-                  </span>
+                  )}
                 </div>
               )}
 

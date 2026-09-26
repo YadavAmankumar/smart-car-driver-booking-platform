@@ -15,6 +15,7 @@ export default function CustomerLoginPage() {
       role="customer"
       showRememberMe
       registerHref="/register"
+      forgotPasswordHref="/forgot-password"
       onLogin={async (values) => {
         const { backendRole } = await loginAndPersist({
           role: "customer",

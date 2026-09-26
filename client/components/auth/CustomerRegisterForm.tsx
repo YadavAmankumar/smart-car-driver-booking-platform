@@ -109,8 +109,10 @@ export default function CustomerRegisterForm() {
         return;
       }
 
-      // If no token is returned, redirect to customer login.
-      router.replace("/login/customer");
+      // Registration now requires email OTP verification.
+      router.replace(
+        `/verify-email?email=${encodeURIComponent(validation.data.email)}`
+      );
     } catch (e) {
       const desc = errorDescriptionFromUnknown(e);
       setError({ title: "Registration failed", description: desc });

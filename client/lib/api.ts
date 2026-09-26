@@ -123,6 +123,52 @@ function getAuthToken(): string | null {
   return getSessionToken();
 }
 
+export type ForgotPasswordResponse = {
+  success: boolean;
+  message?: string;
+};
+
+export async function forgotPassword(email: string) {
+  const res = await api.post<ForgotPasswordResponse>(
+    "/auth/forgot-password",
+    { email },
+  );
+
+  return res.data;
+}
+
+export type VerifyResetOtpResponse = {
+  success: boolean;
+  message?: string;
+  resetToken?: string;
+};
+
+export async function verifyResetOtp(email: string, otp: string) {
+  const res = await api.post<VerifyResetOtpResponse>(
+    "/auth/verify-reset-otp",
+    { email, otp },
+  );
+
+  return res.data;
+}
+
+export type ResetPasswordResponse = {
+  success: boolean;
+  message?: string;
+};
+
+export async function resetPassword(
+  resetToken: string,
+  newPassword: string,
+) {
+  const res = await api.post<ResetPasswordResponse>(
+    "/auth/reset-password",
+    { resetToken, newPassword },
+  );
+
+  return res.data;
+}
+
 export type EstimatePricingPayload = {
   pickupLocation: string;
   dropLocation: string;
