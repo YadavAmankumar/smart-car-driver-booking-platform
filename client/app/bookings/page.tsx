@@ -18,8 +18,8 @@ type Booking = {
   pickupTime?: string;
   bookingStatus?: string;
   paymentMethod?: string;
-  driver?: { name?: string; _id?: string } | string;
-  car?: { name?: string; _id?: string; carType?: string } | string;
+  driver?: { name?: string; _id?: string } | string | null;
+  car?: { carName?: string; carNumber?: string; carModel?: string; _id?: string } | string | null;
   carType?: string;
 };
 

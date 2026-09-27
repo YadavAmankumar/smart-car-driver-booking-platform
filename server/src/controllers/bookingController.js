@@ -15,8 +15,8 @@ const {
 } = require("../services/bookingLifecycleService");
 
 const bookingPopulate = (query) => query
-  .populate({ path: "driver", select: "driverName experience phoneNumber" })
-  .populate({ path: "car", select: "carName carNumber" });
+  .populate({ path: "driver", select: "driverName experience phoneNumber imageUrl" })
+  .populate({ path: "car", select: "carName carNumber imageUrl" });
 
 const canAccessBooking = async (user, booking) => {
   if (user.role === "admin") return true;
@@ -448,16 +448,9 @@ exports.getCustomerBookings = asyncHandler(async (req, res) => {
     });
   }
 
-  const bookings = await Booking.find({ customer: customerId })
-    .sort({ createdAt: -1 })
-    .populate({
-      path: "driver",
-      select: "driverName experience phoneNumber",
-    })
-    .populate({
-      path: "car",
-      select: "carName carNumber",
-    });
+  const bookings = await bookingPopulate(
+    Booking.find({ customer: customerId }).sort({ createdAt: -1 })
+  );
 
   return res.status(200).json({
     success: true,

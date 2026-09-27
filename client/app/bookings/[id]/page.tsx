@@ -40,7 +40,7 @@ type BookingDetail = {
     phoneNumber?: string;
     experience?: number;
     _id?: string;
-  } | string;
+  } | string | null;
 
   car?: {
     carName?: string;
@@ -48,7 +48,7 @@ type BookingDetail = {
     carNumber?: string;
     carType?: string;
     _id?: string;
-  } | string;
+  } | string | null;
 };
 function formatDate(d?: string) {
   if (!d) return "";

@@ -28,6 +28,7 @@ type Driver = {
   driverName?: string;
   phoneNumber?: string;
   experience?: number;
+  imageUrl?: string | null;
   status?: string;
   accountProvisioned?: boolean;
   account?: {
@@ -181,6 +182,11 @@ export default function AdminDriversPage() {
 
   const [viewOpen, setViewOpen] = useState(false);
   const [viewDriver, setViewDriver] = useState<Driver | null>(null);
+
+  const [imageOpen, setImageOpen] = useState(false);
+  const [imageDriver, setImageDriver] = useState<Driver | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -538,6 +544,92 @@ export default function AdminDriversPage() {
     }
   };
 
+  const uploadDriverImage = async (file: File) => {
+    const id = getDriverId(imageDriver);
+    if (!id) {
+      toast.error("Driver id missing");
+      return;
+    }
+
+    const apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL?.trim() ||
+      "http://localhost:5001/api/v1";
+    const token = localStorage.getItem("token");
+
+    const formData = new FormData();
+    formData.append("driverImage", file);
+
+    try {
+      setImageLoading(true);
+      setImageError(null);
+
+      const res = await axios.post<{ data?: Driver }>(
+        `${apiBaseUrl}/drivers/${id}/image`,
+        formData,
+        {
+          headers: token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : undefined,
+        },
+      );
+
+      const updatedDriver = res.data?.data;
+      if (updatedDriver) {
+        setImageDriver(updatedDriver);
+      }
+
+      toast.success("Driver image updated");
+      await refresh();
+    } catch (e) {
+      const msg = getAxiosErrorMessage(e as AxiosError);
+      setImageError(msg);
+      toast.error(msg);
+    } finally {
+      setImageLoading(false);
+    }
+  };
+
+  const deleteDriverImage = async () => {
+    const id = getDriverId(imageDriver);
+    if (!id) {
+      toast.error("Driver id missing");
+      return;
+    }
+
+    const apiBaseUrl =
+      process.env.NEXT_PUBLIC_API_URL?.trim() ||
+      "http://localhost:5001/api/v1";
+    const token = localStorage.getItem("token");
+
+    try {
+      setImageLoading(true);
+      setImageError(null);
+
+      await axios.delete(`${apiBaseUrl}/drivers/${id}/image`, {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : undefined,
+      });
+
+      setImageDriver((current) =>
+        current ? { ...current, imageUrl: null } : current,
+      );
+
+      toast.success("Driver image removed");
+      await refresh();
+    } catch (e) {
+      const msg = getAxiosErrorMessage(e as AxiosError);
+      setImageError(msg);
+      toast.error(msg);
+    } finally {
+      setImageLoading(false);
+    }
+  };
+
   const confirmDelete = async () => {
     const id = getDriverId(deleteDriver);
     if (!id) {
@@ -709,8 +801,17 @@ export default function AdminDriversPage() {
                       <tr key={id} className="hover:bg-slate-50">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
-                              {getDriverInitials(d.driverName)}
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-50 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
+                              {d.imageUrl ? (
+                                <img
+                                  src={d.imageUrl}
+                                  alt={d.driverName ? `${d.driverName} photo` : "Driver photo"}
+                                  className="h-full w-full object-contain"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                getDriverInitials(d.driverName)
+                              )}
                             </div>
 
                             <div className="min-w-0">
@@ -769,6 +870,15 @@ export default function AdminDriversPage() {
                         <td className="px-4 py-3">
                           <Dropdown label="Manage">
                             <MenuItem onClick={() => openView(d)}>View</MenuItem>
+                            <MenuItem
+                              onClick={() => {
+                                setImageDriver(d);
+                                setImageError(null);
+                                setImageOpen(true);
+                              }}
+                            >
+                              Manage Image
+                            </MenuItem>
                             <MenuItem onClick={() => openEdit(d)}>Edit</MenuItem>
                             {!d.accountProvisioned ? (
                               <MenuItem onClick={() => openAccount(d, "provision")}>Set Up Account</MenuItem>
@@ -1034,6 +1144,125 @@ export default function AdminDriversPage() {
               )}
             </Button>
           </div>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={imageOpen}
+        title={`Manage Image${imageDriver?.driverName ? ` — ${imageDriver.driverName}` : ""}`}
+        onClose={() => {
+          if (!imageLoading) {
+            setImageOpen(false);
+            setImageDriver(null);
+            setImageError(null);
+          }
+        }}
+      >
+        <div className="space-y-4">
+          {imageError ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+              <p className="text-sm font-semibold text-red-800">{imageError}</p>
+            </div>
+          ) : null}
+
+          <div className="flex min-h-64 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-4">
+            {imageDriver?.imageUrl ? (
+              <img
+                src={imageDriver.imageUrl}
+                alt={
+                  imageDriver.driverName
+                    ? `${imageDriver.driverName} photo`
+                    : "Driver photo"
+                }
+                className="max-h-80 max-w-full object-contain"
+              />
+            ) : (
+              <div className="flex h-32 w-32 items-center justify-center rounded-full bg-blue-50 text-3xl font-bold text-blue-700 ring-1 ring-blue-100">
+                {getDriverInitials(imageDriver?.driverName)}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              {imageDriver?.imageUrl ? "Current driver photo" : "No driver photo"}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Upload a clear driver photo. The full image will be preserved when displayed.
+            </p>
+          </div>
+
+          <input
+            id="driver-image-upload"
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            disabled={imageLoading}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.currentTarget.value = "";
+
+              if (!file) return;
+
+              if (!file.type.startsWith("image/")) {
+                const message = "Only image files are allowed.";
+                setImageError(message);
+                toast.error(message);
+                return;
+              }
+
+              if (file.size > 10 * 1024 * 1024) {
+                const message = "Image size must be 10 MB or less.";
+                setImageError(message);
+                toast.error(message);
+                return;
+              }
+
+              void uploadDriverImage(file);
+            }}
+          />
+
+          <div className="flex flex-wrap gap-2">
+            <label
+              htmlFor="driver-image-upload"
+              className={`inline-flex h-10 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 ${
+                imageLoading ? "pointer-events-none opacity-50" : ""
+              }`}
+            >
+              {imageDriver?.imageUrl ? "Update Image" : "Upload Image"}
+            </label>
+
+            {imageDriver?.imageUrl ? (
+              <Button
+                type="button"
+                variant="danger"
+                onClick={() => void deleteDriverImage()}
+                disabled={imageLoading}
+              >
+                Delete Image
+              </Button>
+            ) : null}
+
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setImageOpen(false);
+                setImageDriver(null);
+                setImageError(null);
+              }}
+              disabled={imageLoading}
+            >
+              Cancel
+            </Button>
+          </div>
+
+          {imageLoading ? (
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <LoadingSpinner />
+              Saving image…
+            </div>
+          ) : null}
         </div>
       </Dialog>
 

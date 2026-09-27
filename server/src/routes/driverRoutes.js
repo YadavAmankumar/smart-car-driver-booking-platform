@@ -1,6 +1,7 @@
 const express = require("express");
 const authMiddleware = require("../middleware/auth/authMiddleware");
 const authorizeRoles = require("../middleware/auth/authorizeRoles");
+const uploadCarImage = require("../middleware/uploadCarImage");
 
 const {
   addDriver,
@@ -19,6 +20,8 @@ const {
   completeAssignedBooking,
   updateDriver,
   deleteDriver,
+  uploadDriverImage,
+  deleteDriverImage,
 } = require("../controllers/driverController");
 
 const router = express.Router();
@@ -50,6 +53,21 @@ router.get("/:id", authMiddleware, authorizeRoles("admin"), getDriverById);
 
 // Update Driver
 router.put("/:id", authMiddleware, authorizeRoles("admin"), updateDriver);
+
+// Driver Image
+router.post(
+  "/:id/image",
+  authMiddleware,
+  authorizeRoles("admin"),
+  uploadCarImage.single("driverImage"),
+  uploadDriverImage
+);
+router.delete(
+  "/:id/image",
+  authMiddleware,
+  authorizeRoles("admin"),
+  deleteDriverImage
+);
 
 // Delete Driver
 router.delete("/:id", authMiddleware, authorizeRoles("admin"), deleteDriver);

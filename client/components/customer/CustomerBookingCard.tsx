@@ -14,8 +14,8 @@ export type CustomerBooking = {
   pickupTime?: string;
   bookingStatus?: string;
   paymentMethod?: string;
-  driver?: { name?: string } | string;
-  car?: { name?: string } | string;
+  driver?: { name?: string } | string | null;
+  car?: { carName?: string; carNumber?: string; carModel?: string; _id?: string } | string | null;
   carType?: string;
 };
 
@@ -69,7 +69,7 @@ export default function CustomerBookingCard({
                 <span className="font-medium text-slate-600">Car:</span>{" "}
                 {typeof booking.car === "string"
                   ? booking.car
-                  : booking.carType || booking.car?.name || "-"}
+                  : booking.carType || booking.car?.carName || "-"}
               </div>
             </div>
           </div>

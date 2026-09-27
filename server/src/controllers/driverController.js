@@ -29,6 +29,7 @@ const driverResponse = (driver, { includeAccount = false } = {}) => {
     driverName: driver.driverName,
     phoneNumber: driver.phoneNumber,
     experience: driver.experience,
+    imageUrl: driver.imageUrl || null,
     status: driver.status,
     accountProvisioned: Boolean(driver.user),
     createdAt: driver.createdAt,
@@ -653,6 +654,92 @@ exports.updateDriver = asyncHandler(async (req, res) => {
     success: true,
     message: "Driver updated successfully.",
     data: driverResponse(updatedDriver),
+  });
+});
+
+// @desc    Upload or replace driver image
+// @route   POST /api/v1/drivers/:id/image
+// @access  Private/Admin
+exports.uploadDriverImage = asyncHandler(async (req, res) => {
+  if (!hasValidDriverId(req.params.id)) {
+    return sendValidationError(res, "Invalid driver id.");
+  }
+
+  if (!req.file) {
+    return sendValidationError(res, "Driver image is required.");
+  }
+
+  const driver = await Driver.findOne({
+    _id: req.params.id,
+    isDeleted: { $ne: true },
+  });
+
+  if (!driver) {
+    return res.status(404).json({
+      success: false,
+      message: "Driver not found.",
+    });
+  }
+
+  const {
+    uploadDriverImage: uploadDriverImageToCloudinary,
+  } = require("../services/driverImageService");
+
+  const previousPublicId = driver.imagePublicId;
+
+  const uploadedImage = await uploadDriverImageToCloudinary(req.file.buffer);
+
+  driver.imageUrl = uploadedImage.imageUrl;
+  driver.imagePublicId = uploadedImage.imagePublicId;
+  await driver.save();
+
+  if (previousPublicId) {
+    const { deleteDriverImage } = require("../services/driverImageService");
+    await deleteDriverImage(previousPublicId);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Driver image uploaded successfully.",
+    data: driverResponse(driver),
+  });
+});
+
+// @desc    Delete driver image
+// @route   DELETE /api/v1/drivers/:id/image
+// @access  Private/Admin
+exports.deleteDriverImage = asyncHandler(async (req, res) => {
+  if (!hasValidDriverId(req.params.id)) {
+    return sendValidationError(res, "Invalid driver id.");
+  }
+
+  const driver = await Driver.findOne({
+    _id: req.params.id,
+    isDeleted: { $ne: true },
+  });
+
+  if (!driver) {
+    return res.status(404).json({
+      success: false,
+      message: "Driver not found.",
+    });
+  }
+
+  const previousPublicId = driver.imagePublicId;
+
+  driver.imageUrl = null;
+  driver.imagePublicId = null;
+  await driver.save();
+
+  if (previousPublicId) {
+    const { deleteDriverImage } = require("../services/driverImageService");
+    await deleteDriverImage(previousPublicId);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Driver image removed successfully.",
+    data: driverResponse(driver),
   });
 });
 

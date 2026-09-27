@@ -116,7 +116,7 @@ function getCarStatus(car: CarRow): CarStatus {
 
   if (hasUpcomingBooking) return "Reserved";
 
-  return car.isAvailable ? "Available" : "Busy";
+  return "Available";
 }
 
 function getNextCarBooking(car: CarRow): CarSchedule | null {
@@ -159,6 +159,7 @@ export default function AdminCarsPage() {
 
   const [viewOpen, setViewOpen] = useState(false);
   const [viewCar, setViewCar] = useState<CarRow | null>(null);
+  const [viewTripType, setViewTripType] = useState<"current" | "upcoming" | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -260,8 +261,12 @@ export default function AdminCarsPage() {
     return filteredCars.slice(start, end);
   }, [filteredCars, safePage]);
 
-  const openView = (car: CarRow) => {
+  const openView = (
+    car: CarRow,
+    tripType: "current" | "upcoming" | null = null
+  ) => {
     setViewCar(car);
+    setViewTripType(tripType);
     setViewOpen(true);
   };
 
@@ -596,9 +601,8 @@ export default function AdminCarsPage() {
                   <th className="px-4 py-4">Vehicle Category</th>
                   <th className="px-4 py-4">AC</th>
                   <th className="px-4 py-4">Status</th>
-                  <th className="min-w-[250px] px-4 py-4">
-                    Current / Upcoming Trip
-                  </th>
+                  <th className="min-w-[190px] px-4 py-4">Current Trip</th>
+                  <th className="min-w-[190px] px-4 py-4">Upcoming Trip</th>
                   <th className="px-4 py-4">Actions</th>
                 </tr>
               </thead>
@@ -607,7 +611,7 @@ export default function AdminCarsPage() {
                 {loading ? (
                   Array.from({ length: pageSize }).map((_, i) => (
                     <tr key={i} className="hover:bg-slate-50">
-                      <td className="px-4 py-4" colSpan={9}>
+                      <td className="px-4 py-4" colSpan={10}>
                         <div className="flex items-center gap-3">
                           <LoadingSpinner />
                           <span className="text-sm text-slate-600">Loading cars…</span>
@@ -617,7 +621,7 @@ export default function AdminCarsPage() {
                   ))
                 ) : pagedRows.length === 0 ? (
                   <tr>
-                    <td className="px-4 py-6" colSpan={9}>
+                    <td className="px-4 py-6" colSpan={10}>
                       <EmptyState
                         title={error ? "Unable to load cars" : "No cars found"}
                         description={
@@ -632,6 +636,10 @@ export default function AdminCarsPage() {
                   pagedRows.map((c, index) => {
                     const id = c._id ?? "";
                     const status = getCarStatus(c);
+                    const currentBooking =
+                      (c.schedule ?? []).find(
+                        (booking) => booking.bookingStatus === "Ongoing"
+                      ) ?? null;
                     const nextBooking = getNextCarBooking(c);
 
                     const acLabel: "Yes" | "No" = c.isAC ? "Yes" : "No";
@@ -701,31 +709,55 @@ export default function AdminCarsPage() {
                         </td>
 
                         <td className="px-4 py-4 align-middle">
+                          {currentBooking ? (
+                            <div className="space-y-2">
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500">
+                                  Ongoing
+                                </p>
+                                <p className="mt-1 text-sm font-semibold text-slate-800">
+                                  {currentBooking.driver?.driverName ??
+                                    "Driver not assigned"}
+                                </p>
+                              </div>
+
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => openView(c, "current")}
+                              >
+                                View Current Trip
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">
+                              No current trip
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="px-4 py-4 align-middle">
                           {nextBooking ? (
-                            <div className="max-w-[280px] space-y-1.5">
-                              {nextBooking.driver?.driverName ? (
-                                <p className="text-sm font-semibold text-slate-800">
-                                  {nextBooking.driver.driverName}
+                            <div className="space-y-2">
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500">
+                                  Upcoming
                                 </p>
-                              ) : (
-                                <p className="text-sm font-medium text-slate-500">
-                                  Driver not assigned
+                                <p className="mt-1 text-sm font-semibold text-slate-800">
+                                  {nextBooking.driver?.driverName ??
+                                    "Driver not assigned"}
                                 </p>
-                              )}
+                              </div>
 
-                              {nextBooking.bookingDate && nextBooking.pickupTime ? (
-                                <p className="text-xs font-medium text-slate-500">
-                                  {nextBooking.bookingDate.slice(0, 10)}
-                                  {" · "}
-                                  {nextBooking.pickupTime}
-                                </p>
-                              ) : null}
-
-                              {nextBooking.pickupLocation ? (
-                                <p className="truncate text-xs text-slate-400">
-                                  {nextBooking.pickupLocation}
-                                </p>
-                              ) : null}
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => openView(c, "upcoming")}
+                              >
+                                View Upcoming Trip
+                              </Button>
                             </div>
                           ) : (
                             <span className="text-xs text-slate-400">
@@ -785,8 +817,17 @@ export default function AdminCarsPage() {
       {/* View Drawer */}
       <DrawerComponent
         open={viewOpen}
-        title="Car Details"
-        onClose={() => setViewOpen(false)}
+        title={
+          viewTripType === "current"
+            ? "Current Trip"
+            : viewTripType === "upcoming"
+              ? "Upcoming Trip"
+              : "Car Details"
+        }
+        onClose={() => {
+          setViewOpen(false);
+          setViewTripType(null);
+        }}
       >
         {viewCar ? (
           <div className="space-y-4">
@@ -797,7 +838,12 @@ export default function AdminCarsPage() {
                   (booking) => booking.bookingStatus === "Ongoing"
                 ) ?? null;
               const nextBooking = getNextCarBooking(viewCar);
-              const assignment = currentBooking ?? nextBooking;
+              const assignment =
+                viewTripType === "current"
+                  ? currentBooking
+                  : viewTripType === "upcoming"
+                    ? nextBooking
+                    : currentBooking ?? nextBooking;
 
               return (
                 <>

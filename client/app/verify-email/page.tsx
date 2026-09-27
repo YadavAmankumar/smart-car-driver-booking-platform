@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AuthShell from "@/components/auth/AuthShell";
 import AlertCard, { errorDescriptionFromUnknown } from "@/components/auth/AlertCard";
@@ -19,7 +19,7 @@ type VerifyOtpResponse = {
   };
 };
 
-export default function VerifyEmailPage() {
+function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -223,5 +223,13 @@ export default function VerifyEmailPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<main className="min-h-[70vh] bg-gradient-to-b from-[#EEF2FF] via-white to-white py-10" />}>
+      <VerifyEmailContent />
+    </Suspense>
   );
 }

@@ -140,6 +140,35 @@ export default function DriverProfilePage() {
         </CardHeader>
 
         <CardContent>
+          <div className="mb-6 flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-50 text-xl font-bold text-blue-700 ring-1 ring-blue-100">
+              {driver.imageUrl ? (
+                <img
+                  src={driver.imageUrl}
+                  alt={driver.driverName ? `${driver.driverName} photo` : "Driver photo"}
+                  className="h-full w-full object-contain"
+                />
+              ) : (
+                (driver.driverName || "D")
+                  .trim()
+                  .split(/\s+/)
+                  .map((part) => part[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-base font-bold text-slate-900">
+                {driver.driverName || "Driver"}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                Driver profile photo managed by administrator
+              </p>
+            </div>
+          </div>
+
           <div className="grid gap-5 md:grid-cols-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">

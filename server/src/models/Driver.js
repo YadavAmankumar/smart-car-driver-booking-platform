@@ -31,6 +31,16 @@ const driverSchema = new mongoose.Schema(
       min: 0,
       max: 80,
     },
+    imageUrl: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+    imagePublicId: {
+      type: String,
+      default: null,
+      trim: true,
+    },
     status: {
       type: String,
       enum: ["Available", "Busy"],

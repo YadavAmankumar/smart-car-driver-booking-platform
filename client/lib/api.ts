@@ -39,6 +39,7 @@ export type GetBookingsResponse = {
 
 type Booking = {
   _id?: string;
+  bookingNumber?: string;
   customerName?: string;
   mobileNumber?: string;
   email?: string;
@@ -52,8 +53,35 @@ type Booking = {
   bookingDate?: string;
   pickupTime?: string;
   estimatedHours?: number;
+  estimatedKm?: number;
+  estimatedDuration?: number;
   paymentMethod?: string;
+  paymentStatus?: string;
+  totalAmount?: number;
+  estimatedFare?: number;
   bookingStatus?: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  statusHistory?: Array<{
+    from?: string;
+    to?: string;
+    changedAt?: string;
+    reason?: string;
+  }>;
+  driver?: {
+    _id?: string;
+    driverName?: string;
+    experience?: number;
+    phoneNumber?: string;
+    imageUrl?: string | null;
+  } | null;
+  car?: {
+    _id?: string;
+    carName?: string;
+    carNumber?: string;
+    carModel?: string;
+    imageUrl?: string | null;
+  } | null;
   notes?: string;
   createdAt?: string;
 };
@@ -610,6 +638,7 @@ export type DriverProfile = {
   driverName?: string;
   phoneNumber?: string;
   experience?: number;
+  imageUrl?: string | null;
   status?: "Available" | "Busy" | string;
   accountProvisioned?: boolean;
 };

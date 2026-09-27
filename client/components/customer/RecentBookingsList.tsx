@@ -7,6 +7,7 @@ import BookingStatusBadges from "./BookingStatusBadges";
 
 export type RecentBooking = {
   _id?: string;
+  bookingNumber?: string;
   pickupLocation?: string;
   dropLocation?: string;
   bookingDate?: string;
@@ -18,11 +19,20 @@ export type RecentBooking = {
   createdAt?: string;
 };
 
-function formatDate(d?: string) {
-  if (!d) return "";
-  const dt = new Date(d);
-  if (Number.isNaN(dt.getTime())) return "";
-  return dt.toLocaleDateString();
+function formatDate(date?: string) {
+  if (!date) return "";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  return parsedDate.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 export default function RecentBookingsList({
@@ -34,69 +44,106 @@ export default function RecentBookingsList({
 
   return (
     <Card>
-      <CardContent className="p-6">
+      <CardContent className="p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Recent Bookings</h2>
-            <p className="mt-2 text-sm text-slate-600">Last 5 rides you requested.</p>
+            <h2 className="text-lg font-bold text-slate-900">
+              Recent Bookings
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Your latest booking activity
+            </p>
           </div>
-          <Badge tone="neutral" className="h-6">
+
+          <Badge tone="neutral" className="h-6 shrink-0">
             {bookings.length} total
           </Badge>
         </div>
 
-        <div className="mt-5 space-y-3">
+        <div className="mt-4 space-y-2">
           {last5.length === 0 ? (
             <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
               No bookings yet.
             </div>
           ) : (
-            last5.map((b) => (
+            last5.map((booking) => (
               <div
-                key={b._id}
-                className="rounded-xl border border-slate-200 bg-white p-4 transition hover:shadow-sm"
+                key={booking._id}
+                className="rounded-xl border border-slate-200 bg-white p-3.5 transition hover:border-slate-300 hover:shadow-sm"
               >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate text-sm font-semibold text-slate-900">
-                        Booking ID: {b._id || "-"}
+                        Booking ID:{" "}
+                        {booking.bookingNumber || booking._id || "-"}
                       </p>
-                      <BookingStatusBadges status={b.bookingStatus || "Pending"} />
+
+                      <BookingStatusBadges
+                        status={booking.bookingStatus || "Pending"}
+                      />
                     </div>
-                    <p className="mt-2 text-sm text-slate-700">
-                      <span className="font-medium text-slate-600">Pickup:</span>{" "}
-                      {b.pickupLocation || "-"}
+
+                    <p
+                      title={booking.pickupLocation || "-"}
+                      className="mt-2 line-clamp-1 text-sm text-slate-700"
+                    >
+                      <span className="font-medium text-slate-600">
+                        Pickup:
+                      </span>{" "}
+                      {booking.pickupLocation || "-"}
                     </p>
-                    <p className="text-sm text-slate-700">
-                      <span className="font-medium text-slate-600">Drop:</span>{" "}
-                      {b.dropLocation || "-"}
+
+                    <p
+                      title={booking.dropLocation || "-"}
+                      className="line-clamp-1 text-sm text-slate-700"
+                    >
+                      <span className="font-medium text-slate-600">
+                        Drop:
+                      </span>{" "}
+                      {booking.dropLocation || "-"}
                     </p>
                   </div>
 
                   <div className="flex flex-col items-start gap-2 sm:items-end">
                     <div className="text-xs font-semibold text-slate-500">
-                      {formatDate(b.bookingDate || b.createdAt)}
-                      {b.pickupTime ? ` • ${b.pickupTime}` : ""}
+                      {formatDate(
+                        booking.bookingDate || booking.createdAt
+                      )}
+
+                      {booking.pickupTime
+                        ? ` • ${booking.pickupTime}`
+                        : ""}
                     </div>
+
                     <Button
                       asChild
                       variant="secondary"
-                      className="rounded-lg px-4"
+                      className="h-9 rounded-lg px-3 text-xs"
                     >
-                      <Link href={`/bookings/${b._id}`}>View Details</Link>
+                      <Link href={`/bookings/${booking._id}`}>
+                        View Details
+                      </Link>
                     </Button>
                   </div>
                 </div>
 
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {b.serviceType ? (
-                    <Badge tone="neutral">{b.serviceType}</Badge>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  {booking.serviceType ? (
+                    <Badge tone="neutral" className="text-[11px]">
+                      {booking.serviceType}
+                    </Badge>
                   ) : null}
-                  {b.paymentMethod ? (
-                    <Badge tone="neutral">Payment: {b.paymentMethod}</Badge>
+
+                  {booking.paymentMethod ? (
+                    <Badge tone="neutral" className="text-[11px]">
+                      Payment: {booking.paymentMethod}
+                    </Badge>
                   ) : (
-                    <Badge tone="neutral">Payment: -</Badge>
+                    <Badge tone="neutral" className="text-[11px]">
+                      Payment: -
+                    </Badge>
                   )}
                 </div>
               </div>
@@ -107,4 +154,3 @@ export default function RecentBookingsList({
     </Card>
   );
 }
-

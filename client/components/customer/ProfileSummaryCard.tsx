@@ -16,43 +16,43 @@ export default function ProfileSummaryCard({
 }) {
   return (
     <Card>
-      <CardHeader className="p-6">
+      <CardHeader className="p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <CardTitle className="text-lg">Profile Summary</CardTitle>
-            <p className="mt-2 text-sm text-slate-600">Your account details at a glance.</p>
+            <CardTitle className="text-base font-extrabold text-slate-950">Profile Summary</CardTitle>
+            <p className="mt-1 text-xs text-slate-500">Your account details at a glance.</p>
           </div>
           <Link
             href="/profile"
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
           >
             Edit Profile
           </Link>
         </div>
       </CardHeader>
 
-      <CardContent className="p-6 pt-0">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold text-slate-600">Name</p>
+      <CardContent className="p-5 pt-0 sm:p-6 sm:pt-0">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Name</p>
             <p className="mt-1 text-sm font-semibold text-slate-900">
               {name || "-"}
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold text-slate-600">Email</p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Email</p>
             <p className="mt-1 text-sm font-semibold text-slate-900">
               {email || "-"}
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold text-slate-600">Phone</p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Phone</p>
             <p className="mt-1 text-sm font-semibold text-slate-900">
               {phone || "-"}
             </p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold text-slate-600">Role</p>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Role</p>
             <p className="mt-1 text-sm font-semibold text-slate-900">
               {role || "customer"}
             </p>
