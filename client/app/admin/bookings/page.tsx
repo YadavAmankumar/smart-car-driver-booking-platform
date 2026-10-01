@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import toast from "react-hot-toast";
 import axios, { type AxiosError } from "axios";
 
@@ -128,6 +129,7 @@ function statusTone(
 
   if (s === "Pending") return "amber";
   if (s === "Confirmed") return "blue";
+  if (s === "Ongoing") return "blue";
   if (s === "Completed") return "green";
   if (s === "Cancelled") return "red";
 
@@ -170,7 +172,7 @@ function MenuItem({
       onClick={() => {
         if (!disabled) onClick();
       }}
-      className={`block w-full rounded-md px-3 py-2 text-left text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`block w-full rounded-lg px-3 py-2 text-left text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50 ${
         tone === "danger"
           ? "text-red-700 hover:bg-red-50"
           : "text-slate-700 hover:bg-slate-50"
@@ -181,6 +183,166 @@ function MenuItem({
   );
 }
 
+function BookingActionsDropdown({
+  label,
+  children,
+}: {
+  label: ReactNode;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [trigger, setTrigger] =
+    useState<HTMLDivElement | null>(null);
+
+  const [position, setPosition] = useState({
+    top: 0,
+    left: 0,
+  });
+
+  useEffect(() => {
+    if (!open || !trigger) return;
+
+    const updatePosition = () => {
+      const rect = trigger.getBoundingClientRect();
+
+      const menuWidth = 192;
+      const menuHeight = 190;
+      const gap = 8;
+      const padding = 8;
+
+      const spaceLeft =
+        rect.left - gap - padding;
+
+      const spaceRight =
+        window.innerWidth -
+        rect.right -
+        gap -
+        padding;
+
+      let left =
+        spaceLeft >= menuWidth
+          ? rect.left - menuWidth - gap
+          : rect.right + gap;
+
+      if (
+        spaceLeft < menuWidth &&
+        spaceRight < menuWidth
+      ) {
+        left = Math.max(
+          padding,
+          Math.min(
+            rect.right - menuWidth,
+            window.innerWidth -
+              menuWidth -
+              padding,
+          ),
+        );
+      }
+
+      let top = rect.top;
+
+      if (
+        top + menuHeight >
+        window.innerHeight - padding
+      ) {
+        top =
+          window.innerHeight -
+          menuHeight -
+          padding;
+      }
+
+      top = Math.max(
+        padding,
+        top,
+      );
+
+      setPosition({
+        top,
+        left,
+      });
+    };
+
+    updatePosition();
+
+    window.addEventListener(
+      "resize",
+      updatePosition,
+    );
+
+    window.addEventListener(
+      "scroll",
+      updatePosition,
+      true,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "resize",
+        updatePosition,
+      );
+
+      window.removeEventListener(
+        "scroll",
+        updatePosition,
+        true,
+      );
+    };
+  }, [open, trigger]);
+
+  return (
+    <div
+      ref={setTrigger}
+      className="relative inline-flex"
+    >
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        onClick={() =>
+          setOpen((current) => !current)
+        }
+        className="gap-2 rounded-lg"
+      >
+        {label}
+
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className={`h-4 w-4 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="m6 9 6 6 6-6"
+          />
+        </svg>
+      </Button>
+
+      {open
+        ? createPortal(
+            <div
+              className="fixed z-[99999] min-w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_50px_rgba(15,23,42,0.16)] ring-1 ring-black/5"
+              style={{
+                top: position.top,
+                left: position.left,
+              }}
+              onClick={() => {
+                setOpen(false);
+              }}
+            >
+              {children}
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
+}
 export default function AdminBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -410,127 +572,187 @@ export default function AdminBookingsPage() {
   ];
 
   return (
-    <main className="w-full px-6 py-6">
-      <section className="space-y-4">
-        {/* Header */}
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-lg font-bold text-slate-900">
-              Booking Management
-            </h1>
+    <main className="min-h-full w-full bg-[radial-gradient(circle_at_top,#f8fafc_0%,#f1f5f9_45%,#eef2f7_100%)] px-2 py-3 sm:px-4 lg:px-5">
+      <section className="mx-auto w-full max-w-[1500px] space-y-3">
 
-            <p className="mt-1 text-sm text-slate-600">
-              Review and manage all bookings.
-            </p>
-          </div>
+        {/* ========================================================= */}
+        {/* PAGE HEADER */}
+        {/* ========================================================= */}
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="w-full sm:w-72">
-              <Input
-                value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
-                }
-                placeholder="Search by customer name or phone"
-              />
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white shadow-md shadow-slate-900/10">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-[18px] w-[18px]"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-9 4h10m-9 4h6m-8 5h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2Z"
+                    />
+                  </svg>
+                </div>
+
+                <div>
+                  <h1 className="text-xl font-extrabold tracking-tight text-slate-950 sm:text-[22px]">
+                    Booking Management
+                  </h1>
+
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                    Review, assign and manage customer bookings.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="w-full sm:w-56">
-              <Select
-                value={statusFilter}
-                onChange={(e) =>
-                  setStatusFilter(
-                    e.target.value as typeof statusFilter,
-                  )
-                }
-              >
-                <option value="All">
-                  All Statuses
-                </option>
+            <div className="min-w-[145px] rounded-xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white px-3 py-2 shadow-sm">
+              <p className="text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500">
+                Current Results
+              </p>
 
-                {allowedStatuses.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </Select>
+              <p className="mt-0.5 text-xl font-extrabold tracking-tight text-slate-950">
+                {totalCount}
+                <span className="ml-1 text-sm font-medium text-slate-500">
+                  bookings
+                </span>
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Booking table */}
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-xs font-bold text-slate-600">
-                  <th className="px-4 py-3">
-                    Customer
-                  </th>
+        {/* ========================================================= */}
+        {/* SEARCH / FILTER BAR */}
+        {/* ========================================================= */}
 
-                  <th className="px-4 py-3">
-                    Phone
-                  </th>
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-3 shadow-[0_8px_30px_rgba(15,23,42,0.05)]">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xs font-extrabold tracking-tight text-slate-950">
+                Find Bookings
+              </h2>
 
-                  <th className="px-4 py-3">
-                    Service
-                  </th>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                Search customers or filter bookings by status.
+              </p>
+            </div>
 
-                  <th className="px-4 py-3">
-                    Booked Hours
-                  </th>
+            <div className="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-600 sm:block">
+              {statusFilter === "All"
+                ? "All statuses"
+                : statusFilter}
+            </div>
+          </div>
 
-                  <th className="px-4 py-3">
-                    Pickup
-                  </th>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <div className="relative">
+              <div className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="h-[18px] w-[18px]"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path
+                    strokeLinecap="round"
+                    d="m20 20-3.5-3.5"
+                  />
+                </svg>
+              </div>
 
-                  <th className="px-4 py-3">
-                    Drop
-                  </th>
+              <div className="[&_input]:pl-10">
+                <Input
+                  value={search}
+                  onChange={(e) =>
+                    setSearch(e.target.value)
+                  }
+                  placeholder="Search by customer name or phone"
+                />
+              </div>
+            </div>
 
-                  <th className="px-4 py-3">
-                    Driver
-                  </th>
+            <Select
+              value={statusFilter}
+              onChange={(e) =>
+                setStatusFilter(
+                  e.target.value as typeof statusFilter,
+                )
+              }
+            >
+              <option value="All">
+                All Statuses
+              </option>
 
-                  <th className="px-4 py-3">
-                    Car
-                  </th>
+              {allowedStatuses.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
 
-                  <th className="px-4 py-3">
-                    Fare
-                  </th>
+        {/* ========================================================= */}
+        {/* BOOKING TABLE */}
+        {/* ========================================================= */}
 
-                  <th className="px-4 py-3">
-                    Payment
-                  </th>
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-2.5 sm:px-4">
+            <div>
+              <h2 className="text-xs font-extrabold tracking-tight text-slate-950">
+                All Bookings
+              </h2>
 
-                  <th className="px-4 py-3">
-                    Booking Status
-                  </th>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                Booking details, assignment and payment information.
+              </p>
+            </div>
 
-                  <th className="px-4 py-3">
-                    Actions
-                  </th>
+            <div className="shrink-0 rounded-full bg-slate-50 px-3 py-1.5 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200">
+              Page {safePage} of {totalPages}
+            </div>
+          </div>
+
+          <div className="overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[1120px] border-collapse">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/90 text-left text-[10px] font-extrabold uppercase tracking-[0.07em] text-slate-500">
+                  <th className="w-[15%] bg-slate-50 px-2.5 py-2.5 text-left">Customer</th>
+                  <th className="w-[8%] px-2 py-2.5">Phone</th>
+                  <th className="w-[11%] px-2 py-2.5">Service &amp; Vehicle</th>
+                  <th className="w-[6%] px-2 py-2.5">Booked Hours</th>
+                  <th className="w-[10%] px-2 py-2.5">Pickup</th>
+                  <th className="w-[10%] px-2 py-2.5">Drop</th>
+                  <th className="w-[9%] px-2 py-2.5">Driver</th>
+                  <th className="w-[8%] px-2 py-2.5">Car</th>
+                  <th className="w-[8%] px-2 py-2.5">Fare (₹)</th>
+                  <th className="w-[9%] px-2 py-2.5">Payment</th>
+                  <th className="w-[8%] px-2 py-2.5">Status</th>
+                  <th className="w-[5%] bg-slate-50 px-1.5 py-2.5 text-center">Actions</th>
                 </tr>
               </thead>
 
-              <tbody className="divide-y divide-slate-200 text-sm">
+              <tbody className="divide-y divide-slate-100 text-sm">
                 {loading ? (
                   Array.from({
                     length: pageSize,
                   }).map((_, i) => (
-                    <tr
-                      key={i}
-                      className="hover:bg-slate-50"
-                    >
+                    <tr key={i}>
                       <td
-                        className="px-4 py-4"
-                        colSpan={13}
+                        className="px-4 py-5"
+                        colSpan={12}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1">
                           <LoadingSpinner />
 
-                          <span className="text-sm text-slate-600">
+                          <span className="text-sm text-slate-500">
                             Loading bookings…
                           </span>
                         </div>
@@ -540,15 +762,15 @@ export default function AdminBookingsPage() {
                 ) : pagedRows.length === 0 ? (
                   <tr>
                     <td
-                      className="px-4 py-6"
-                      colSpan={13}
+                      className="px-6 py-10"
+                      colSpan={12}
                     >
                       <EmptyState
-                        title="No bookings"
+                        title="No bookings found"
                         description={
                           error
                             ? "Could not load bookings. Try again."
-                            : "Adjust your search or filters to find bookings."
+                            : "Adjust your search or status filter to find bookings."
                         }
                       />
                     </td>
@@ -584,8 +806,7 @@ export default function AdminBookingsPage() {
                     const fare = formatMoney(
                       b.totalAmount ??
                         b.estimatedFare ??
-                        b.pricing
-                          ?.estimatedTotal,
+                        b.pricing?.estimatedTotal,
                     );
 
                     const paymentMethod =
@@ -610,113 +831,214 @@ export default function AdminBookingsPage() {
                     const paymentVerifiedType =
                       b.payment?.verifiedType ?? "";
 
-                    const status =
-                      (
-                        b.bookingStatus ??
-                        "Pending"
-                      ).toString();
+                    const status = (
+                      b.bookingStatus ??
+                      "Pending"
+                    ).toString();
 
                     return (
                       <tr
                         key={bookingId}
-                        className="hover:bg-slate-50"
+                        className="group border-b border-slate-100/80 transition-colors last:border-b-0 hover:bg-slate-50/70"
                       >
-                        <td className="px-4 py-3 text-slate-700">
-                          <div className="font-semibold text-slate-900">
-                            {customer}
-                          </div>
-
-                          <div className="mt-1 max-w-36 truncate text-xs text-slate-500">
-                            {bookingId}
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-3 text-slate-600">
-                          {phone}
-                        </td>
-
-                        <td className="px-4 py-3 text-slate-600">
-                          {service}
-
-                          {service ===
-                            "Car with Driver" &&
-                          (b.vehicleCategory ||
-                            b.vehicleAc) ? (
-                            <div className="mt-1 text-xs font-semibold text-slate-500">
-                              {b.vehicleCategory ??
-                                "Vehicle"}
-                              {b.vehicleAc
-                                ? ` • ${b.vehicleAc}`
-                                : ""}
+                        {/* Customer */}
+                        <td className="bg-white px-2.5 py-2.5 align-top group-hover:bg-slate-50/70">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-[10px] font-extrabold text-indigo-700 ring-1 ring-indigo-100">
+                              {customer !== "—"
+                                ? customer
+                                    .trim()
+                                    .charAt(0)
+                                    .toUpperCase()
+                                : "?"}
                             </div>
-                          ) : null}
+
+                            <div className="min-w-0">
+                              <p className="truncate text-[12px] font-bold text-slate-900">
+                                {customer}
+                              </p>
+
+                              <p
+                                title={bookingId}
+                                className="mt-0.5 max-w-[150px] truncate text-[10px] font-medium text-slate-400"
+                              >
+                                {bookingId}
+                              </p>
+                            </div>
+                          </div>
                         </td>
 
-                        <td className="px-4 py-3 text-slate-600">
-                          {service === "Driver Only"
-                            ? `${b.estimatedHours ?? "—"} hrs`
-                            : "—"}
+                        {/* Phone */}
+                        <td className="px-2.5 py-2.5 align-top">
+                          <span className="truncate text-[11px] font-semibold text-slate-600">
+                            {phone}
+                          </span>
                         </td>
 
-                        <td className="max-w-48 px-4 py-3 text-slate-600">
-                          {pickup}
+                        {/* Service */}
+                        <td className="px-2.5 py-2.5 align-top">
+                          <div className="min-w-0">
+                            <p className="truncate text-[11px] font-bold text-slate-800">
+                              {service}
+                            </p>
+
+                            {service ===
+                              "Car with Driver" &&
+                            (b.vehicleCategory ||
+                              b.vehicleAc) ? (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {b.vehicleCategory ? (
+                                  <Badge tone="neutral">
+                                    {b.vehicleCategory}
+                                  </Badge>
+                                ) : null}
+
+                                {b.vehicleAc ? (
+                                  <Badge tone="blue">
+                                    {b.vehicleAc}
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
                         </td>
 
-                        <td className="max-w-48 px-4 py-3 text-slate-600">
-                          {drop}
+                        {/* Hours */}
+                        <td className="px-2.5 py-2.5 align-top">
+                          <span className="whitespace-nowrap text-[11px] font-semibold text-slate-700">
+                            {service === "Driver Only"
+                              ? `${b.estimatedHours ?? "—"} hrs`
+                              : "—"}
+                          </span>
                         </td>
 
-                        <td className="px-4 py-3 text-slate-600">
-                          {driverName}
+                        {/* Pickup */}
+                        <td className="px-2.5 py-2.5 align-top">
+                          <div className="max-w-full min-w-0">
+                            <p
+                              title={pickup}
+                              className="line-clamp-2 text-[10px] font-medium leading-[1.35] text-slate-600"
+                            >
+                              {pickup}
+                            </p>
+                          </div>
                         </td>
 
-                        <td className="px-4 py-3 text-slate-600">
-                          {carLabel}
+                        {/* Drop */}
+                        <td className="px-2.5 py-2.5 align-top">
+                          <div className="max-w-full min-w-0">
+                            <p
+                              title={drop}
+                              className="line-clamp-2 text-[10px] font-medium leading-[1.35] text-slate-600"
+                            >
+                              {drop}
+                            </p>
+                          </div>
                         </td>
 
-                        <td className="px-4 py-3 font-semibold text-slate-700">
-                          {fare}
+                        {/* Driver */}
+                        <td className="px-2.5 py-2.5 align-top">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-extrabold text-slate-600 ring-1 ring-slate-200">
+                                {driverName !== "—"
+                                  ? driverName
+                                      .trim()
+                                      .charAt(0)
+                                      .toUpperCase()
+                                  : "—"}
+                              </div>
+
+                              <span className="truncate text-[11px] font-bold text-slate-700">
+                                {driverName}
+                              </span>
+                            </div>
+                          </div>
                         </td>
 
-                        <td className="px-4 py-3">
-                          <div className="min-w-44">
-                            <div className="font-semibold text-slate-900">
+                        {/* Car */}
+                        <td className="px-2.5 py-2.5 align-top">
+                          <div className="min-w-0">
+                            <p className="truncate text-[11px] font-bold text-slate-700">
+                              {carLabel}
+                            </p>
+
+                            {b.car?.carName ? (
+                              <p className="mt-0.5 text-[10px] font-medium text-slate-400">
+                                {b.car.carName}
+                              </p>
+                            ) : null}
+                          </div>
+                        </td>
+
+                        {/* Fare */}
+                        <td className="px-2.5 py-2.5 align-top">
+                          <span className="whitespace-nowrap text-[12px] font-extrabold text-slate-950">
+                            {fare}
+                          </span>
+                        </td>
+
+                        {/* Payment */}
+                        <td className="px-2.5 py-2.5 align-top">
+                          <div className="min-w-0">
+                            <p className="whitespace-nowrap text-[11px] font-extrabold text-slate-950">
                               {paymentAmount}
-                            </div>
+                            </p>
 
-                            <div className="mt-1 text-xs font-medium text-slate-500">
+                            <p className="mt-0.5 text-[10px] font-medium text-slate-500">
                               {paymentMethod}
-                            </div>
+                            </p>
 
-                            {paymentStatus === "Paid" && paymentDriver ? (
-                              <div className="mt-2 text-xs font-semibold text-emerald-700">
-                                {paymentVerifiedType === "Cash Collection"
+                            {paymentStatus === "Paid" &&
+                            paymentDriver ? (
+                              <p className="mt-1 line-clamp-2 text-[10px] font-bold leading-[1.35] text-emerald-700">
+                                {paymentVerifiedType ===
+                                "Cash Collection"
                                   ? `Cash Collected by ${paymentDriver}`
                                   : paymentVerifiedType ===
                                       "UPI Driver Confirmation"
                                     ? `UPI confirmed by ${paymentDriver}`
                                     : `Payment confirmed by ${paymentDriver}`}
-                              </div>
+                              </p>
                             ) : (
-                              <div className="mt-2 text-xs font-medium text-amber-600">
+                              <span className="mt-1 inline-flex rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
                                 {paymentStatus}
-                              </div>
+                              </span>
                             )}
                           </div>
                         </td>
 
-                        <td className="px-4 py-3">
+                        {/* Booking Status */}
+                        <td className="px-2.5 py-2.5 align-top">
                           <Badge
-                            tone={statusTone(
-                              status,
-                            )}
+                            tone={statusTone(status)}
                           >
                             {status}
                           </Badge>
                         </td>
 
-                        <td className="px-4 py-3">
-                          <Dropdown label="Manage">
+                        {/* Actions */}
+                        <td className=" z-0 bg-white px-3 py-2 align-top text-center shadow-[-1px_0_0_0_rgba(241,245,249,1)] group-hover:bg-slate-50/70">
+                          <BookingActionsDropdown
+  label={
+    <span
+      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-slate-200"
+      aria-label="Manage booking"
+      title="Manage booking"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className="h-[18px] w-[18px]"
+        aria-hidden="true"
+      >
+        <circle cx="5" cy="12" r="1.7" />
+        <circle cx="12" cy="12" r="1.7" />
+        <circle cx="19" cy="12" r="1.7" />
+      </svg>
+    </span>
+  }
+>
                             <MenuItem
                               onClick={() =>
                                 openView(b)
@@ -770,7 +1092,7 @@ export default function AdminBookingsPage() {
                             >
                               Cancel Booking
                             </MenuItem>
-                          </Dropdown>
+                          </BookingActionsDropdown>
                         </td>
                       </tr>
                     );
@@ -779,30 +1101,39 @@ export default function AdminBookingsPage() {
               </tbody>
             </table>
           </div>
-        </div>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between gap-4">
-          <p className="text-sm text-slate-600">
-            Showing{" "}
-            {totalCount === 0
-              ? 0
-              : (safePage - 1) *
-                  pageSize +
-                1}
-            -
-            {Math.min(
-              safePage * pageSize,
-              totalCount,
-            )}{" "}
-            of {totalCount} bookings
-          </p>
+          {/* ========================================================= */}
+          {/* PAGINATION */}
+          {/* ========================================================= */}
 
-          <Pagination
-            page={safePage}
-            totalPages={totalPages}
-            onPageChange={setPage}
-          />
+          <div className="flex flex-col gap-2 border-t border-slate-200 bg-slate-50/70 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+            <p className="text-xs font-medium text-slate-500 sm:text-sm">
+              Showing{" "}
+              <span className="font-bold text-slate-800">
+                {totalCount === 0
+                  ? 0
+                  : (safePage - 1) *
+                      pageSize +
+                    1}
+                -
+                {Math.min(
+                  safePage * pageSize,
+                  totalCount,
+                )}
+              </span>{" "}
+              of{" "}
+              <span className="font-bold text-slate-800">
+                {totalCount}
+              </span>{" "}
+              bookings
+            </p>
+
+            <Pagination
+              page={safePage}
+              totalPages={totalPages}
+              onPageChange={setPage}
+            />
+          </div>
         </div>
       </section>
 
@@ -819,163 +1150,307 @@ export default function AdminBookingsPage() {
       >
         {viewBooking ? (
           <div className="space-y-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold text-slate-500">
+
+            {/* Booking Header */}
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
+                    {viewBooking.customerName
+                      ? viewBooking.customerName
+                          .trim()
+                          .charAt(0)
+                          .toUpperCase()
+                      : "?"}
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-base font-bold text-slate-900">
+                      {viewBooking.customerName ?? "—"}
+                    </p>
+
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      {viewBooking.mobileNumber ?? "—"}
+                    </p>
+                  </div>
+                </div>
+
+                <Badge
+                  tone={statusTone(
+                    viewBooking.bookingStatus,
+                  )}
+                >
+                  {viewBooking.bookingStatus ??
+                    "Pending"}
+                </Badge>
+              </div>
+
+              <div className="mt-4 border-t border-slate-200 pt-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Booking ID
                 </p>
 
-                <p className="mt-1 text-sm font-bold text-slate-900">
-                  {viewBooking._id ??
-                    "—"}
+                <p className="mt-1 break-all text-xs font-semibold text-slate-700">
+                  {viewBooking._id ?? "—"}
                 </p>
               </div>
-
-              <Badge
-                tone={statusTone(
-                  viewBooking.bookingStatus,
-                )}
-              >
-                {viewBooking.bookingStatus ??
-                  "Pending"}
-              </Badge>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Detail
-                label="Customer"
-                value={
-                  viewBooking.customerName ??
-                  "—"
-                }
-              />
+            {/* Service Information */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-[18px] w-[18px]"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 17h14M7 17v2m10-2v2M6 13h12l-1.5-5h-9L6 13Zm0 0a2 2 0 0 0-2 2v1h16v-1a2 2 0 0 0-2-2"
+                    />
+                  </svg>
+                </div>
 
-              <Detail
-                label="Phone"
-                value={
-                  viewBooking.mobileNumber ??
-                  "—"
-                }
-              />
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    Service Information
+                  </p>
 
-              <Detail
-                label="Service"
-                value={
-                  viewBooking.serviceType ??
-                  "—"
-                }
-              />
+                  <p className="text-xs text-slate-500">
+                    Requested booking details
+                  </p>
+                </div>
+              </div>
 
-              {viewBooking.serviceType ===
-                "Driver Only" ? (
+              <div className="grid grid-cols-2 gap-4">
                 <Detail
-                  label="Booked Hours"
+                  label="Service"
                   value={
-                    viewBooking.estimatedHours !==
-                    undefined
-                      ? `${viewBooking.estimatedHours} hrs`
-                      : "—"
+                    viewBooking.serviceType ?? "—"
                   }
                 />
-              ) : null}
 
-              {viewBooking.serviceType ===
+                {viewBooking.serviceType ===
+                "Driver Only" ? (
+                  <Detail
+                    label="Booked Hours"
+                    value={
+                      viewBooking.estimatedHours !==
+                      undefined
+                        ? `${viewBooking.estimatedHours} hrs`
+                        : "—"
+                    }
+                  />
+                ) : null}
+
+                {viewBooking.serviceType ===
                 "Car with Driver" ? (
-                <>
-                  <Detail
-                    label="Vehicle Category"
-                    value={
-                      viewBooking.vehicleCategory ??
-                      "—"
-                    }
-                  />
+                  <>
+                    <Detail
+                      label="Vehicle Category"
+                      value={
+                        viewBooking.vehicleCategory ??
+                        "—"
+                      }
+                    />
 
-                  <Detail
-                    label="AC / Non-AC"
-                    value={
-                      viewBooking.vehicleAc ??
-                      "—"
-                    }
-                  />
-                </>
-              ) : null}
+                    <Detail
+                      label="AC / Non-AC"
+                      value={
+                        viewBooking.vehicleAc ?? "—"
+                      }
+                    />
+                  </>
+                ) : null}
 
-              <Detail
-                label="Payment"
-                value={
-                  viewBooking.paymentMethod ??
-                  "—"
-                }
-              />
+                <Detail
+                  label="Payment Method"
+                  value={
+                    viewBooking.paymentMethod ??
+                    "—"
+                  }
+                />
 
-              <Detail
-                label="Pickup"
-                value={
-                  viewBooking.pickupLocation ??
-                  "—"
-                }
-              />
-
-              <Detail
-                label="Drop"
-                value={
-                  viewBooking.dropLocation ??
-                  "—"
-                }
-              />
-
-              <Detail
-                label="Driver"
-                value={
-                  viewBooking.driver
-                    ?.driverName ??
-                  "—"
-                }
-              />
-
-              <Detail
-                label="Car"
-                value={
-                  viewBooking.car
-                    ?.carNumber ??
-                  "—"
-                }
-              />
-
-              <Detail
-                label="Fare"
-                value={formatMoney(
-                  viewBooking.totalAmount ??
-                    viewBooking.estimatedFare ??
-                    viewBooking.pricing
-                      ?.estimatedTotal,
-                )}
-              />
-
-              <Detail
-                label="Created"
-                value={formatDate(
-                  viewBooking.createdAt ??
-                    viewBooking.bookingDate,
-                )}
-              />
+                <Detail
+                  label="Created"
+                  value={formatDate(
+                    viewBooking.createdAt ??
+                      viewBooking.bookingDate,
+                  )}
+                />
+              </div>
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-bold text-slate-700">
-                Actions
+            {/* Route */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+              <div className="mb-4 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-[18px] w-[18px]"
+                  >
+                    <circle cx="6" cy="18" r="2" />
+                    <circle cx="18" cy="6" r="2" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M8 18h2a4 4 0 0 0 4-4v-4a4 4 0 0 1 4-4"
+                    />
+                  </svg>
+                </div>
+
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    Trip Route
+                  </p>
+
+                  <p className="text-xs text-slate-500">
+                    Pickup and destination
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex gap-3">
+                  <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                    <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Pickup
+                    </p>
+
+                    <p className="mt-1 break-words text-sm font-semibold leading-5 text-slate-800">
+                      {viewBooking.pickupLocation ?? "—"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="ml-3.5 h-5 border-l border-dashed border-slate-300" />
+
+                <div className="flex gap-3">
+                  <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
+                    <div className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Drop
+                    </p>
+
+                    <p className="mt-1 break-words text-sm font-semibold leading-5 text-slate-800">
+                      {viewBooking.dropLocation ?? "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Assignment */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+              <div className="mb-4 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-[18px] w-[18px]"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2m5-10a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm9 2v6m-3-3h6"
+                    />
+                  </svg>
+                </div>
+
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    Assignment
+                  </p>
+
+                  <p className="text-xs text-slate-500">
+                    Driver and vehicle
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Driver
+                  </p>
+
+                  <p className="mt-1 text-sm font-bold text-slate-800">
+                    {viewBooking.driver?.driverName ?? "Not assigned"}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Car
+                  </p>
+
+                  <p className="mt-1 text-sm font-bold text-slate-800">
+                    {viewBooking.car?.carNumber ?? "Not assigned"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment / Fare */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 text-white shadow-lg shadow-slate-900/10">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Total Fare
+                  </p>
+
+                  <p className="mt-1 text-2xl font-bold">
+                    {formatMoney(
+                      viewBooking.totalAmount ??
+                        viewBooking.estimatedFare ??
+                        viewBooking.pricing
+                          ?.estimatedTotal,
+                    )}
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Payment
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-slate-200">
+                    {viewBooking.paymentMethod ?? "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Booking Actions
               </p>
 
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <Button
                   type="button"
                   size="sm"
                   variant="primary"
                   onClick={() => {
                     setViewOpen(false);
-                    openConfirm(
-                      viewBooking,
-                    );
+                    openConfirm(viewBooking);
                   }}
                   disabled={
                     viewBooking.bookingStatus !==
@@ -991,9 +1466,7 @@ export default function AdminBookingsPage() {
                   variant="secondary"
                   onClick={() => {
                     setViewOpen(false);
-                    openAssign(
-                      viewBooking,
-                    );
+                    openAssign(viewBooking);
                   }}
                   disabled={
                     !canManageAssignment(
@@ -1013,7 +1486,6 @@ export default function AdminBookingsPage() {
                   variant="danger"
                   onClick={() => {
                     setViewOpen(false);
-
                     openStatusDialog(
                       viewBooking,
                       "Cancelled",
@@ -1032,6 +1504,7 @@ export default function AdminBookingsPage() {
                 </Button>
               </div>
             </div>
+
           </div>
         ) : null}
       </DrawerComponent>
@@ -1048,35 +1521,83 @@ export default function AdminBookingsPage() {
         }
       >
         {confirmBooking ? (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-600">
-              Confirm this booking? It
-              will update status to{" "}
-              <span className="font-semibold">
-                Confirmed
-              </span>
-              .
-            </p>
+          <div className="space-y-5">
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-bold text-slate-700">
-                Booking
-              </p>
+            <div className="flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="h-[18px] w-[18px]"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9 12.75 11.25 15 15 9.75"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M12 3 20 6v5c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3Z"
+                  />
+                </svg>
+              </div>
 
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                {confirmBooking._id ??
-                  "—"}
-              </p>
+              <div>
+                <p className="text-sm font-bold text-slate-900">
+                  Confirm this booking?
+                </p>
+
+                <p className="mt-0.5 text-xs text-slate-600">
+                  The booking status will change to Confirmed.
+                </p>
+              </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 shadow-sm">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Booking ID
+              </p>
+
+              <p className="mt-1 break-all text-sm font-bold text-slate-900">
+                {confirmBooking._id ?? "—"}
+              </p>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Customer
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-slate-800">
+                    {confirmBooking.customerName ?? "—"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Fare
+                  </p>
+
+                  <p className="mt-1 text-sm font-bold text-slate-900">
+                    {formatMoney(
+                      confirmBooking.totalAmount ??
+                        confirmBooking.estimatedFare ??
+                        confirmBooking.pricing?.estimatedTotal,
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() =>
-                  setConfirmDialogOpen(
-                    false,
-                  )
+                  setConfirmDialogOpen(false)
                 }
               >
                 Close
@@ -1086,9 +1607,7 @@ export default function AdminBookingsPage() {
                 type="button"
                 variant="primary"
                 onClick={async () => {
-                  if (
-                    !confirmBooking?._id
-                  )
+                  if (!confirmBooking?._id)
                     return;
 
                   try {
@@ -1103,9 +1622,7 @@ export default function AdminBookingsPage() {
                         "Booking confirmed",
                     );
 
-                    setConfirmDialogOpen(
-                      false,
-                    );
+                    setConfirmDialogOpen(false);
 
                     await refreshBookings();
                   } catch (e) {
@@ -1117,7 +1634,7 @@ export default function AdminBookingsPage() {
                   }
                 }}
               >
-                Confirm
+                Confirm Booking
               </Button>
             </div>
           </div>
@@ -1136,59 +1653,103 @@ export default function AdminBookingsPage() {
         }
       >
         {statusDialogBooking ? (
-          <div className="space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-bold text-slate-700">
-                Booking
-              </p>
+          <div className="space-y-5">
 
-              <p className="mt-1 text-sm font-semibold text-slate-900">
-                {statusDialogBooking._id ??
-                  "—"}
-              </p>
+            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Booking ID
+                  </p>
 
-              <p className="mt-2 text-xs text-slate-600">
-                Current:{" "}
-                <span className="font-semibold">
+                  <p className="mt-1 break-all text-sm font-bold text-slate-900">
+                    {statusDialogBooking._id ?? "—"}
+                  </p>
+                </div>
+
+                <Badge
+                  tone={statusTone(
+                    String(
+                      statusDialogBooking.bookingStatus ??
+                        "Pending",
+                    ),
+                  )}
+                >
                   {String(
                     statusDialogBooking.bookingStatus ??
                       "Pending",
                   )}
-                </span>
-              </p>
+                </Badge>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Customer
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-slate-800">
+                    {statusDialogBooking.customerName ?? "—"}
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Phone
+                  </p>
+
+                  <p className="mt-1 text-sm font-semibold text-slate-800">
+                    {statusDialogBooking.mobileNumber ?? "—"}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="w-full">
+            <div>
+              <div className="mb-2">
+                <p className="text-sm font-bold text-slate-900">
+                  New Status
+                </p>
+
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Select the status you want to apply.
+                </p>
+              </div>
+
               <Select
                 value={statusToSet}
                 onChange={(e) =>
                   setStatusToSet(
-                    e.target
-                      .value as BookingStatus,
+                    e.target.value as BookingStatus,
                   )
                 }
               >
-                {allowedStatuses.map(
-                  (s) => (
-                    <option
-                      key={s}
-                      value={s}
-                    >
-                      {s}
-                    </option>
-                  ),
-                )}
+                {allowedStatuses.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
               </Select>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div
+              className={`rounded-xl border p-3 text-xs font-medium ${
+                statusToSet === "Cancelled"
+                  ? "border-red-100 bg-red-50 text-red-700"
+                  : "border-blue-100 bg-blue-50 text-blue-700"
+              }`}
+            >
+              {statusToSet === "Cancelled"
+                ? "This action will mark the booking as cancelled."
+                : `The booking will be updated to ${statusToSet}.`}
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 type="button"
                 variant="secondary"
                 onClick={() =>
-                  setStatusDialogOpen(
-                    false,
-                  )
+                  setStatusDialogOpen(false)
                 }
               >
                 Close
@@ -1197,15 +1758,12 @@ export default function AdminBookingsPage() {
               <Button
                 type="button"
                 variant={
-                  statusToSet ===
-                  "Cancelled"
+                  statusToSet === "Cancelled"
                     ? "danger"
                     : "primary"
                 }
                 onClick={async () => {
-                  if (
-                    !statusDialogBooking?._id
-                  )
+                  if (!statusDialogBooking?._id)
                     return;
 
                   try {
@@ -1220,9 +1778,7 @@ export default function AdminBookingsPage() {
                         "Booking updated",
                     );
 
-                    setStatusDialogOpen(
-                      false,
-                    );
+                    setStatusDialogOpen(false);
 
                     await refreshBookings();
                   } catch (e) {
@@ -1234,7 +1790,7 @@ export default function AdminBookingsPage() {
                   }
                 }}
               >
-                Update
+                Update Status
               </Button>
             </div>
           </div>
@@ -1662,19 +2218,30 @@ function AssignTripDialog({
         }
       }}
     >
-      <div className="w-full max-w-md space-y-4">
-        {/* Booking information */}
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-slate-500">
-                Booking
-              </p>
+      <div className="w-full max-w-lg max-h-[calc(100vh-7rem)] overflow-y-auto space-y-5 pr-1">
 
-              <p className="mt-1 text-sm font-bold text-slate-900">
-                {booking._id ??
-                  "—"}
-              </p>
+        {/* Booking summary */}
+        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white">
+                {booking.customerName
+                  ? booking.customerName
+                      .trim()
+                      .charAt(0)
+                      .toUpperCase()
+                  : "?"}
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-900">
+                  {booking.customerName ?? "Customer"}
+                </p>
+
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  {booking.mobileNumber ?? "—"}
+                </p>
+              </div>
             </div>
 
             <Badge
@@ -1682,15 +2249,23 @@ function AssignTripDialog({
                 booking.bookingStatus,
               )}
             >
-              {booking.bookingStatus ??
-                "Pending"}
+              {booking.bookingStatus ?? "Pending"}
             </Badge>
+          </div>
+
+          <div className="mt-4 border-t border-slate-200 pt-3">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Booking ID
+            </p>
+
+            <p className="mt-1 break-all text-xs font-semibold text-slate-700">
+              {booking._id ?? "—"}
+            </p>
           </div>
 
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge tone="neutral">
-              {booking.serviceType ??
-                "Service"}
+              {booking.serviceType ?? "Service"}
             </Badge>
 
             {isCarWithDriver &&
@@ -1711,22 +2286,64 @@ function AssignTripDialog({
 
         {/* Error */}
         {error ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-            <p className="text-sm font-semibold text-red-800">
-              Assignment Failed
-            </p>
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+            <div className="flex gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                !
+              </div>
 
-            <p className="mt-1 text-xs text-red-700">
-              {error}
-            </p>
+              <div>
+                <p className="text-sm font-bold text-red-800">
+                  Assignment Failed
+                </p>
+
+                <p className="mt-1 text-xs leading-5 text-red-700">
+                  {error}
+                </p>
+              </div>
+            </div>
           </div>
         ) : null}
 
-        {/* Driver */}
-        <div>
+        {/* Driver selection */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                className="h-[18px] w-[18px]"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
+                />
+                <circle cx="9" cy="7" r="4" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M19 8v6m-3-3h6"
+                />
+              </svg>
+            </div>
+
+            <div>
+              <p className="text-sm font-bold text-slate-900">
+                Assign Driver
+              </p>
+
+              <p className="text-xs text-slate-500">
+                Select the driver for this booking.
+              </p>
+            </div>
+          </div>
+
           <label
             htmlFor="assign-driver"
-            className="mb-1.5 block text-sm font-semibold text-slate-800"
+            className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500"
           >
             Driver
           </label>
@@ -1735,9 +2352,7 @@ function AssignTripDialog({
             id="assign-driver"
             value={selectedDriverId}
             onChange={(e) =>
-              setSelectedDriverId(
-                e.target.value,
-              )
+              setSelectedDriverId(e.target.value)
             }
             disabled={
               loadingDrivers ||
@@ -1751,15 +2366,6 @@ function AssignTripDialog({
             </option>
 
             {drivers.map((driver) => {
-              /*
-               * IMPORTANT:
-               * Backend returns `id`,
-               * not `_id`.
-               *
-               * This fixes:
-               * Encountered two children with
-               * the same key, ""
-               */
               const driverId =
                 driver.id ?? "";
 
@@ -1784,52 +2390,85 @@ function AssignTripDialog({
           </Select>
 
           {selectedDriver ? (
-            <p className="mt-1.5 text-xs text-slate-500">
-              {selectedDriver.phoneNumber
-                ? selectedDriver.phoneNumber
-                : "Available driver"}
-            </p>
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
+              <span className="text-xs font-medium text-slate-500">
+                Selected driver
+              </span>
+
+              <span className="text-xs font-bold text-slate-800">
+                {selectedDriver.phoneNumber ??
+                  "Available driver"}
+              </span>
+            </div>
           ) : null}
 
           {!loadingDrivers &&
           !drivers.length ? (
-            <p className="mt-1.5 text-xs font-medium text-red-600">
+            <p className="mt-2 text-xs font-medium text-red-600">
               No available drivers.
             </p>
           ) : null}
         </div>
 
-        {/* Car */}
+        {/* Car selection */}
         {isCarWithDriver ? (
-          <div>
-            <div className="mb-1.5 flex items-center justify-between gap-3">
-              <label
-                htmlFor="assign-car"
-                className="block text-sm font-semibold text-slate-800"
-              >
-                Car
-              </label>
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    className="h-[18px] w-[18px]"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M5 17h14M7 17v2m10-2v2M6 13h12l-1.5-5h-9L6 13Zm0 0a2 2 0 0 0-2 2v1h16v-1a2 2 0 0 0-2-2"
+                    />
+                  </svg>
+                </div>
 
-              {requestedVehicleCategory ? (
-                <Badge tone="blue">
-                  {requestedVehicleCategory}
-                </Badge>
-              ) : null}
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    Assign Car
+                  </p>
 
-              {requestedVehicleAc ? (
-                <Badge tone="blue">
-                  {requestedVehicleAc}
-                </Badge>
-              ) : null}
+                  <p className="text-xs text-slate-500">
+                    Only compatible vehicles are shown.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {requestedVehicleCategory ? (
+                  <Badge tone="blue">
+                    {requestedVehicleCategory}
+                  </Badge>
+                ) : null}
+
+                {requestedVehicleAc ? (
+                  <Badge tone="blue">
+                    {requestedVehicleAc}
+                  </Badge>
+                ) : null}
+              </div>
             </div>
+
+            <label
+              htmlFor="assign-car"
+              className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500"
+            >
+              Car
+            </label>
 
             <Select
               id="assign-car"
               value={selectedCarId}
               onChange={(e) =>
-                setSelectedCarId(
-                  e.target.value,
-                )
+                setSelectedCarId(e.target.value)
               }
               disabled={
                 loadingCars ||
@@ -1844,34 +2483,29 @@ function AssignTripDialog({
                     : "No compatible cars"}
               </option>
 
-              {compatibleCars.map(
-                (car) => {
-                  const carId =
-                    getRecordId(car);
+              {compatibleCars.map((car) => {
+                const carId =
+                  getRecordId(car);
 
-                  if (!carId) {
-                    return null;
-                  }
+                if (!carId) {
+                  return null;
+                }
 
-                  return (
-                    <option
-                      key={carId}
-                      value={carId}
-                    >
-                      {car.carName ??
-                        "Car"}{" "}
-                      -{" "}
-                      {car.carNumber ??
-                        "No number"}
-                    </option>
-                  );
-                },
-              )}
+                return (
+                  <option
+                    key={carId}
+                    value={carId}
+                  >
+                    {car.carName ?? "Car"} -{" "}
+                    {car.carNumber ?? "No number"}
+                  </option>
+                );
+              })}
             </Select>
 
             {requestedVehicleCategory ||
             requestedVehicleAc ? (
-              <p className="mt-1.5 text-xs text-slate-500">
+              <p className="mt-2 text-xs leading-5 text-slate-500">
                 Showing available{" "}
                 {requestedVehicleCategory ??
                   "matching category"}{" "}
@@ -1884,50 +2518,59 @@ function AssignTripDialog({
 
             {!loadingCars &&
             !compatibleCars.length ? (
-              <p className="mt-1.5 text-xs font-medium text-red-600">
+              <p className="mt-2 text-xs font-medium text-red-600">
                 No available matching cars found.
               </p>
             ) : null}
 
             {selectedCar ? (
-              <p className="mt-1.5 text-xs text-slate-500">
-                Selected:{" "}
-                {selectedCar.carName ??
-                  "Car"}{" "}
-                •{" "}
-                {selectedCar.carNumber ??
-                  "No number"}
-              </p>
+              <div className="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5">
+                <span className="text-xs font-medium text-slate-500">
+                  Selected car
+                </span>
+
+                <span className="text-right text-xs font-bold text-slate-800">
+                  {selectedCar.carName ?? "Car"}{" "}
+                  •{" "}
+                  {selectedCar.carNumber ??
+                    "No number"}
+                </span>
+              </div>
             ) : null}
           </div>
         ) : null}
 
         {/* Assignment summary */}
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-          <p className="text-xs font-bold text-slate-700">
-            Assignment Summary
-          </p>
+        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4 shadow-sm">
+          <div className="mb-3">
+            <p className="text-sm font-bold text-slate-900">
+              Assignment Summary
+            </p>
 
-          <div className="mt-2 space-y-1.5 text-sm">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-slate-500">
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              Review the selected resources before assigning.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-3 py-3">
+              <span className="text-xs font-medium text-slate-500">
                 Driver
               </span>
 
-              <span className="font-semibold text-slate-900">
-                {selectedDriver
-                  ?.driverName ??
+              <span className="max-w-[65%] text-right text-sm font-bold text-slate-900">
+                {selectedDriver?.driverName ??
                   "Not selected"}
               </span>
             </div>
 
             {isCarWithDriver ? (
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-slate-500">
+              <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-3 py-3">
+                <span className="text-xs font-medium text-slate-500">
                   Car
                 </span>
 
-                <span className="font-semibold text-slate-900">
+                <span className="max-w-[65%] text-right text-sm font-bold text-slate-900">
                   {selectedCar
                     ? `${selectedCar.carName ?? "Car"} - ${
                         selectedCar.carNumber ??
@@ -1937,13 +2580,13 @@ function AssignTripDialog({
                 </span>
               </div>
             ) : (
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-slate-500">
+              <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-3 py-3">
+                <span className="text-xs font-medium text-slate-500">
                   Vehicle
                 </span>
 
-                <span className="font-semibold text-slate-900">
-                  Customer&apos;s own car
+                <span className="text-right text-sm font-bold text-slate-900">
+                  Customer's own car
                 </span>
               </div>
             )}
@@ -1951,7 +2594,7 @@ function AssignTripDialog({
         </div>
 
         {/* Buttons */}
-        <div className="flex justify-end gap-2 pt-1">
+        <div className="sticky bottom-0 z-10 -mx-1 flex flex-col-reverse gap-2 border-t border-slate-200 bg-white/95 px-1 pt-4 pb-1 backdrop-blur-sm sm:flex-row sm:justify-end">
           <Button
             type="button"
             variant="secondary"
