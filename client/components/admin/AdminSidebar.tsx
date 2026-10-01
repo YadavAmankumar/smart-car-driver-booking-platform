@@ -50,6 +50,7 @@ export default function AdminSidebar() {
     | { label: string; comingSoon: true }
   > = [
     { label: "Dashboard", href: "/admin/dashboard" },
+    { label: "Profile", href: "/admin/profile" },
     { label: "Bookings", href: "/admin/bookings" },
     { label: "Cars", href: "/admin/cars" },
     { label: "Drivers", href: "/admin/drivers" },

@@ -462,7 +462,7 @@ export default function Navbar() {
 
                   {authRole === "admin" && (
                     <Link
-                      href="/profile"
+                      href="/admin/profile"
                       role="menuitem"
                       className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-950"
                       onClick={() => setUserMenuOpen(false)}

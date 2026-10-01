@@ -301,7 +301,7 @@ export function Dropdown({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="relative">
+    <div className={open ? "relative z-50" : "relative z-0"}>
       <Button
         type="button"
         variant="secondary"
